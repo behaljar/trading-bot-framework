@@ -17,7 +17,7 @@ make install
 ```
 
 ### 2. Configuration
-Copy `config.yaml.template` to `config.yaml` and customize:
+Copy `.env.example` to `.env` and customize (or use environment variables):
 
 ```yaml
 # Trading configuration
@@ -57,7 +57,6 @@ make dev-dashboard
 trading-bot-framework/
 ├── config/              # Configuration
 │   ├── settings.py      # Main configuration class
-│   └── config.yaml.template # YAML configuration template
 ├── data/                # Data components
 │   ├── __init__.py      # Data source abstractions
 │   ├── yahoo_finance_source.py
@@ -66,15 +65,12 @@ trading-bot-framework/
 ├── strategies/          # Trading strategies
 │   ├── base_strategy.py # Abstract base class
 │   ├── trend_following.py # SMA strategy
-│   └── mean_reversion.py  # RSI strategy
 ├── risk/                # Risk management
 │   └── risk_manager.py  # Risk manager
 ├── execution/           # Execution layer
-│   └── paper_trader.py  # Paper trading simulator
 ├── monitoring/          # Monitoring and reporting
-│   └── performance_tracker.py
+│   └── alert_system.py
 ├── utils/               # Utilities
-│   ├── indicators.py    # Technical indicators
 │   └── logger.py        # Logging setup
 ├── notebooks/           # Jupyter notebooks
 ├── tests/               # Unit tests
@@ -100,12 +96,19 @@ class MyStrategy(BaseStrategy):
         super().__init__(params)
         # Your initialization here
     
-    def generate_signals(self, data):
-        # Your signal generation logic
-        # Return pandas Series with 1=BUY, -1=SELL, 0=HOLD
-        signals = pd.Series(0, index=data.index)
-        # ... your logic here ...
-        return signals
+    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generates trading signals based on data
+
+        Args:
+            data: DataFrame with OHLCV data and optionally additional feature columns
+
+        Returns:
+            DataFrame with columns:
+            - signal: int (1=BUY, -1=SELL, 0=HOLD)
+            - stop_loss: float (optional, stop loss price)
+            - take_profit: float (optional, take profit price)
+        """
     
     def get_strategy_name(self):
         return "My_Custom_Strategy"
