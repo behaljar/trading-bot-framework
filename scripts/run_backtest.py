@@ -291,4 +291,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    run_backtest(args.strategy, args.symbol, args.start, args.end, args.data_source, args.timeframe, args.debug, args.no_sl_tp)
+    # Load config to get defaults if arguments not provided
+    config = load_config()
+    
+    # Use config defaults if arguments not provided
+    strategy = args.strategy or config.strategy_name
+    symbol = args.symbol or (config.symbols[0] if config.symbols else "AAPL")
+    
+    run_backtest(strategy, symbol, args.start, args.end, args.data_source, args.timeframe, args.debug, args.no_sl_tp)
