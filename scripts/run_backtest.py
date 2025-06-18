@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
+from strategies.mean_reversion import RSIStrategy
 from utils.logger import setup_logger
 
 def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str, data_source: str = None, timeframe: str = None, debug: bool = False, no_sl_tp: bool = False):
@@ -75,6 +76,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     # Select strategy
     if strategy_name.lower() in ["sma", "sma_crossover", "trend_following"]:
         strategy_class = SMAStrategy
+    elif strategy_name.lower() in ["rsi", "rsi_mean_reversion"]:
+        strategy_class = RSIStrategy
     else:
         logger.error(f"Unknown strategy: {strategy_name}")
         return None
@@ -277,8 +280,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Run trading strategy backtest')
-    parser.add_argument('--strategy', default='sma', help='Strategy name (sma, rsi)')
-    parser.add_argument('--symbol', default='AAPL', help='Symbol to test')
+    parser.add_argument('--strategy', help='Strategy name (sma, rsi)')
+    parser.add_argument('--symbol', help='Symbol to test')
     parser.add_argument('--start', default='2024-06-01', help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end', default='2025-01-01', help='End date (YYYY-MM-DD)')
     parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv) - overrides config')

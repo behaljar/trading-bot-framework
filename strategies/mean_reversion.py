@@ -22,6 +22,7 @@ class RSIStrategy(BaseStrategy):
 
 
     def add_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Adds RSI indicator to the data"""
 
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
