@@ -215,13 +215,13 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     bt = Backtest(
         data,
         BacktestWrapper,
-        cash=10000,  # $10k capital
-        commission=0,
+        cash=config.initial_capital,
+        commission=config.commission,
         trade_on_close=True,
         hedging=True,
         exclusive_orders=True,
-        spread=0.0,
-        margin=1
+        spread=config.slippage,
+        margin=0.01
     )
 
     results = bt.run()
