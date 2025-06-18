@@ -16,7 +16,7 @@ class YahooFinanceSource(DataSource):
             # Yahoo Finance has different timeframe formats
             yf_intervals = {
                 "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
-                "1h": "1h", "1d": "1d", "1w": "1wk", "1M": "1mo"
+                "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1wk", "1M": "1mo"
             }
             interval = yf_intervals.get(timeframe, "1d")
 
