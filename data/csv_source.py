@@ -174,9 +174,11 @@ class CSVDataSource(DataSource):
             
             # Filter by date range
             if start_date:
-                data = data[data.index >= start_date]
+                start_dt = pd.to_datetime(start_date)
+                data = data[data.index >= start_dt]
             if end_date:
-                data = data[data.index <= end_date]
+                end_dt = pd.to_datetime(end_date)
+                data = data[data.index <= end_dt]
                 
             return data
             

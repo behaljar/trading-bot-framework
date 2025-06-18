@@ -33,7 +33,7 @@ run:
 # === TESTING ===
 test:
 	@echo "🧪 Running tests..."
-	python -m pytest tests/ -v --cov=trading_bot
+	python -m pytest tests/ -v --cov=strategies --cov=data --cov=risk --cov=execution --cov=monitoring --cov=utils
 
 # === UTILITIES ===
 install:

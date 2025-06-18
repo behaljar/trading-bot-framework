@@ -54,6 +54,18 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
         logger.error(f"Failed to load data for {symbol} from {config.data_source}")
         return None
     
+    # Convert to microBTC for fractional trading if dealing with BTC data
+        # BUT only if we're NOT using preprocessed data (which is already in microBTC)
+        if 'BTC' in symbol.upper():
+            logger.info("Converting prices to microBTC for fractional trading")
+            # Convert OHLC prices to microBTC (divide by 1e6)
+            price_columns = ['Open', 'High', 'Low', 'Close']
+            for col in price_columns:
+                if col in data.columns:
+                    data[col] = data[col] / 1e6
+            # Adjust volume (multiply by 1e6 to compensate)
+            if 'Volume' in data.columns:
+                data['Volume'] = data['Volume'] * 1e6
 
     # Log available feature columns
     feature_columns = [col for col in data.columns if col not in ['Open', 'High', 'Low', 'Close', 'Volume']]
@@ -120,7 +132,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
             # Debug: print signal info
             if debug and signal != 0:
                 pos_info = f"Long({self.position.size})" if self.position and self.position.is_long else f"Short({abs(self.position.size)})" if self.position and self.position.is_short else "None"
-                print(f"Day {current_idx}: Signal={signal}, Price={current_price:.2f}, Position={pos_info}")
+                price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                print(f"Day {current_idx}: Signal={signal}, Price={current_price:.2f}{price_unit}, Position={pos_info}")
 
             if current_idx < len(self.signals):
                 # Close any existing position first if signal changes direction
@@ -143,7 +156,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                             target_value = current_account_value * 0.01
                             units = max(1, int(target_value / current_price))
                             if debug:
-                                print(f"  Buying: {units} units @ {current_price:.2f} (target: ${target_value:.2f})")
+                                price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                print(f"  Buying: {units} units @ {current_price:.2f}{price_unit} (target: ${target_value:.2f})")
                             self.buy(size=units)
                         else:
                             if stop_loss and stop_loss > 0:
@@ -151,14 +165,16 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                                 if risk_per_share > 0:
                                     units = max(1, int(risk_amount / risk_per_share))
                                     if debug:
-                                        print(f"  Buying: {units} units @ {current_price:.2f} (SL: {stop_loss:.2f})")
+                                        price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                        print(f"  Buying: {units} units @ {current_price:.2f}{price_unit} (SL: {stop_loss:.2f}{price_unit})")
                                     self.buy(size=units, sl=stop_loss, tp=take_profit)
                             else:
                                 # No stop loss - use fixed sizing
                                 target_value = current_account_value * 0.01
                                 units = max(1, int(target_value / current_price))
                                 if debug:
-                                    print(f"  Buying: {units} units @ {current_price:.2f} (no SL)")
+                                    price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                    print(f"  Buying: {units} units @ {current_price:.2f}{price_unit} (no SL)")
                                 self.buy(size=units)
 
                 elif signal == -1:  # Sell signal (short)
@@ -171,7 +187,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                             target_value = current_account_value * 0.01
                             units = max(1, int(target_value / current_price))
                             if debug:
-                                print(f"  Selling short: {units} units @ {current_price:.2f} (target: ${target_value:.2f})")
+                                price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                print(f"  Selling short: {units} units @ {current_price:.2f}{price_unit} (target: ${target_value:.2f})")
                             self.sell(size=units)
                         else:
                             if stop_loss and stop_loss > 0:
@@ -179,14 +196,16 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                                 if risk_per_share > 0:
                                     units = max(1, int(risk_amount / risk_per_share))
                                     if debug:
-                                        print(f"  Selling short: {units} units @ {current_price:.2f} (SL: {stop_loss:.2f})")
+                                        price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                        print(f"  Selling short: {units} units @ {current_price:.2f}{price_unit} (SL: {stop_loss:.2f}{price_unit})")
                                     self.sell(size=units, sl=stop_loss, tp=take_profit)
                             else:
                                 # No stop loss - use fixed sizing
                                 target_value = current_account_value * 0.01
                                 units = max(1, int(target_value / current_price))
                                 if debug:
-                                    print(f"  Selling short: {units} units @ {current_price:.2f} (no SL)")
+                                    price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
+                                    print(f"  Selling short: {units} units @ {current_price:.2f}{price_unit} (no SL)")
                                 self.sell(size=units)
 
     # Run backtest with sufficient capital for Bitcoin trading
@@ -240,8 +259,12 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                 pnl_pct = trade['ReturnPct']
                 duration = trade['Duration']
                 
+                price_unit = "μBTC" if 'BTC' in symbol.upper() else ""
                 logger.info(f"Trade {i+1}: {entry_time} -> {exit_time}")
-                logger.info(f"  Size: {size:.0f} units | Entry: {entry_price:.6f} | Exit: {exit_price:.6f}")
+                if 'BTC' in symbol.upper():
+                    logger.info(f"  Size: {size:.0f} units | Entry: {entry_price:.2f}{price_unit} | Exit: {exit_price:.2f}{price_unit}")
+                else:
+                    logger.info(f"  Size: {size:.0f} units | Entry: {entry_price:.6f} | Exit: {exit_price:.6f}")
                 logger.info(f"  P&L: ${pnl:.2f} ({pnl_pct:.2f}%) | Duration: {duration}")
         else:
             logger.info("No trades executed")
@@ -254,10 +277,10 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Run trading strategy backtest')
-    parser.add_argument('--strategy', default='sma', help='Strategy name (sma, rsi, trend_following, mean_reversion)')
+    parser.add_argument('--strategy', default='sma', help='Strategy name (sma, rsi)')
     parser.add_argument('--symbol', default='AAPL', help='Symbol to test')
-    parser.add_argument('--start', default='2022-01-01', help='Start date (YYYY-MM-DD)')
-    parser.add_argument('--end', default='2023-12-31', help='End date (YYYY-MM-DD)')
+    parser.add_argument('--start', default='2024-06-01', help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end', default='2025-01-01', help='End date (YYYY-MM-DD)')
     parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv) - overrides config')
     parser.add_argument('--timeframe', help='Timeframe (1m, 5m, 15m, 30m, 1h, 1d) - overrides config')
     parser.add_argument('--debug', action='store_true', help='Enable debug data export')

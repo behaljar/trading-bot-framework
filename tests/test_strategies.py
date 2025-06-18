@@ -28,11 +28,20 @@ class TestSMAStrategy(unittest.TestCase):
 
     def test_generate_signals(self):
         """Test SMA signal generation"""
-        signals = self.strategy.generate_signals(self.test_data)
+        result = self.strategy.generate_signals(self.test_data)
 
-        self.assertEqual(len(signals), len(self.test_data))
+        # Check that result is a DataFrame with the right shape
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(len(result), len(self.test_data))
+        
+        # Check that signal column exists and has valid values
+        self.assertIn('signal', result.columns)
         self.assertTrue(all(signal in [Signal.BUY.value, Signal.SELL.value, Signal.HOLD.value]
-                          for signal in signals))
+                          for signal in result['signal']))
+        
+        # Check that stop_loss and take_profit columns exist
+        self.assertIn('stop_loss', result.columns)
+        self.assertIn('take_profit', result.columns)
 
 if __name__ == '__main__':
     unittest.main()
