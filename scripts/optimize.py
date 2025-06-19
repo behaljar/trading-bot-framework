@@ -159,6 +159,8 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         )
     elif config.data_source == "csv":
         source = CSVDataSource(data_directory=config.csv_data_directory)
+    elif config.data_source == "csv_processed":
+        source = CSVDataSource(data_directory=config.csv_data_directory, use_processed=True)
     else:
         logger.error(f"Unknown data source: {config.data_source}")
         return None
@@ -326,6 +328,15 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         
         logger.info(f"\nAll optimization outputs saved to: {output_dir}")
         
+        # Clean up any stray HTML files created by plot_heatmaps() in current directory
+        script_dir = Path(__file__).parent
+        stray_files = ['optimize.html', 'heatmap.html', 'plot.html']
+        for stray_file in stray_files:
+            stray_path = script_dir / stray_file
+            if stray_path.exists():
+                stray_path.unlink()
+                logger.info(f"Cleaned up stray file: {stray_path}")
+        
         return optimization_result
         
     except Exception as e:
@@ -352,12 +363,16 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
         
         # Default heatmap (max aggregation)
         try:
+            from bokeh.plotting import output_file, save, reset_output
+            
+            # Reset any previous bokeh output settings
+            reset_output()
+            
+            heatmap_html_file = output_dir / f"{output_filename}_heatmap_interactive.html"
+            output_file(str(heatmap_html_file))
+            
             fig = plot_heatmaps(heatmap_series)
             if fig:
-                # Save as HTML (bokeh plot)
-                from bokeh.plotting import output_file, save
-                heatmap_html_file = output_dir / f"{output_filename}_heatmap_interactive.html"
-                output_file(str(heatmap_html_file))
                 save(fig)
                 logger.info(f"Interactive heatmap saved to: {heatmap_html_file}")
         except Exception as e:
@@ -365,11 +380,16 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
         
         # Mean aggregation heatmap
         try:
+            from bokeh.plotting import output_file, save, reset_output
+            
+            # Reset any previous bokeh output settings
+            reset_output()
+            
+            heatmap_mean_file = output_dir / f"{output_filename}_heatmap_mean.html"
+            output_file(str(heatmap_mean_file))
+            
             fig_mean = plot_heatmaps(heatmap_series, agg='mean')
             if fig_mean:
-                from bokeh.plotting import output_file, save
-                heatmap_mean_file = output_dir / f"{output_filename}_heatmap_mean.html"
-                output_file(str(heatmap_mean_file))
                 save(fig_mean)
                 logger.info(f"Mean heatmap saved to: {heatmap_mean_file}")
         except Exception as e:
@@ -474,7 +494,7 @@ if __name__ == "__main__":
     parser.add_argument('--symbol', help='Symbol to optimize')
     parser.add_argument('--start', default='2024-01-01', help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end', default='2024-12-31', help='End date (YYYY-MM-DD)')
-    parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv) - overrides config')
+    parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv, csv_processed) - overrides config')
     parser.add_argument('--timeframe', help='Timeframe (1m, 5m, 15m, 30m, 1h, 1d) - overrides config')
     parser.add_argument('--metric', default='Return [%]', help='Optimization metric')
     parser.add_argument('--minimize', action='store_true', help='Minimize metric instead of maximize')

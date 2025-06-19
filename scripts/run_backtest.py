@@ -46,6 +46,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
         )
     elif config.data_source == "csv":
         source = CSVDataSource(data_directory=config.csv_data_directory)
+    elif config.data_source == "csv_processed":
+        source = CSVDataSource(data_directory=config.csv_data_directory, use_processed=True)
     else:
         logger.error(f"Unknown data source: {config.data_source}")
         return None
@@ -335,7 +337,7 @@ if __name__ == "__main__":
     parser.add_argument('--symbol', help='Symbol to test')
     parser.add_argument('--start', default='2024-06-01', help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end', default='2025-01-01', help='End date (YYYY-MM-DD)')
-    parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv) - overrides config')
+    parser.add_argument('--data-source', help='Data source (yahoo, ccxt, csv, csv_processed) - overrides config')
     parser.add_argument('--timeframe', help='Timeframe (1m, 5m, 15m, 30m, 1h, 1d) - overrides config')
     parser.add_argument('--debug', action='store_true', help='Enable debug data export')
     parser.add_argument('--no-sl-tp', action='store_true', help='Disable stop loss and take profit (use fixed position sizing instead)')

@@ -15,6 +15,10 @@ python scripts/optimize.py --strategy sma --symbol AAPL \
 python scripts/optimize.py --strategy sma --symbol BTCUSDC \
   --data-source ccxt --timeframe 1h
 
+# Use processed CSV data
+python scripts/optimize.py --strategy sma --symbol ETHUSDC \
+  --data-source csv_processed --timeframe 15m
+
 # Optimize for Sharpe Ratio
 python scripts/optimize.py --strategy sma --symbol AAPL \
   --metric "Sharpe Ratio"
@@ -74,7 +78,8 @@ python scripts/optimize.py --strategy sma --symbol AAPL \
 |--------|---------|---------|
 | `yahoo` | Stocks, ETFs, Indices | `AAPL`, `SPY`, `^GSPC` |
 | `ccxt` | Cryptocurrencies | `BTCUSDC`, `ETHUSDT` |
-| `csv` | Custom data | Any symbol with CSV file |
+| `csv` | Custom raw data | Any symbol with CSV file |
+| `csv_processed` | Preprocessed data with features | `ETHUSDC` (from `data/processed/`) |
 
 ## Timeframes
 

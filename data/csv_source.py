@@ -11,14 +11,22 @@ from .base_data_source import DataSource
 class CSVDataSource(DataSource):
     """CSV data source for backtesting with local files"""
 
-    def __init__(self, data_directory: str = "data/csv"):
+    def __init__(self, data_directory: str = "data/csv", use_processed: bool = False):
         """
         Initialize CSV data source
         
         Args:
             data_directory: Directory containing CSV files
+            use_processed: Whether to use processed data directory (data/processed/)
         """
-        self.data_directory = data_directory
+        if use_processed:
+            # Use processed data directory
+            base_dir = os.path.dirname(data_directory) if data_directory != "data/csv" else "data"
+            self.data_directory = os.path.join(base_dir, "processed")
+        else:
+            self.data_directory = data_directory
+            
+        self.use_processed = use_processed
         self.loaded_data = {}  # Cache for loaded data
         
         # Create directory if it doesn't exist
@@ -28,7 +36,8 @@ class CSVDataSource(DataSource):
         
         # Scan for available CSV files
         self.available_files = self._scan_csv_files()
-        print(f"CSV data source initialized with {len(self.available_files)} files")
+        processed_info = " (processed)" if use_processed else ""
+        print(f"CSV data source{processed_info} initialized with {len(self.available_files)} files")
 
     def _scan_csv_files(self) -> Dict[str, str]:
         """Scan directory for CSV files and map symbols to file paths"""
@@ -39,9 +48,32 @@ class CSVDataSource(DataSource):
             
         for filename in os.listdir(self.data_directory):
             if filename.endswith('.csv'):
-                # Extract symbol from filename (remove .csv extension)
-                symbol = filename[:-4].upper()
-                files[symbol] = os.path.join(self.data_directory, filename)
+                if self.use_processed:
+                    # For processed files, handle patterns like SYMBOL_timeframe_processed.csv or SYMBOL_processed.csv
+                    base_name = filename[:-4]  # Remove .csv
+                    if base_name.endswith('_processed'):
+                        # Remove _processed suffix
+                        base_name = base_name[:-10]
+                        
+                        # Check if there's a timeframe
+                        if '_' in base_name:
+                            parts = base_name.split('_')
+                            symbol = parts[0].upper()
+                            timeframe = '_'.join(parts[1:])  # Handle multi-part timeframes
+                            key = f"{symbol}_{timeframe}"
+                        else:
+                            symbol = base_name.upper()
+                            key = symbol
+                            
+                        files[key] = os.path.join(self.data_directory, filename)
+                    else:
+                        # Regular processed file without _processed suffix
+                        symbol = filename[:-4].upper()
+                        files[symbol] = os.path.join(self.data_directory, filename)
+                else:
+                    # Raw CSV files - extract symbol from filename (remove .csv extension)
+                    symbol = filename[:-4].upper()
+                    files[symbol] = os.path.join(self.data_directory, filename)
                 
         return files
 
@@ -148,29 +180,47 @@ class CSVDataSource(DataSource):
             symbol: Trading symbol (should match CSV filename without extension)
             start_date: Start date in 'YYYY-MM-DD' format
             end_date: End date in 'YYYY-MM-DD' format
-            timeframe: Timeframe (ignored for CSV, returns raw data)
+            timeframe: Timeframe - for processed data, will try to find matching file
             
         Returns:
             DataFrame with OHLCV data
         """
         try:
+            # For processed data, try to find file with matching timeframe
+            search_symbol = symbol
+            if self.use_processed and timeframe != "1d":
+                # Try symbol_timeframe first
+                timeframe_key = f"{symbol}_{timeframe}"
+                if timeframe_key in self.available_files:
+                    search_symbol = timeframe_key
+                elif symbol not in self.available_files:
+                    # If exact symbol not found, try to find any file for this symbol
+                    available = self.get_available_symbols()
+                    symbol_matches = [s for s in available if s.startswith(f"{symbol}_")]
+                    if symbol_matches:
+                        print(f"No {timeframe} data found for {symbol}, available timeframes: {[s.split('_', 1)[1] for s in symbol_matches if '_' in s]}")
+                        # Use first available timeframe as fallback
+                        search_symbol = symbol_matches[0]
+                    else:
+                        search_symbol = symbol  # Fall back to original symbol
+            
             # Check if symbol is available
-            if symbol not in self.available_files:
+            if search_symbol not in self.available_files:
                 # Try to find similar symbols
                 available = self.get_available_symbols()
                 similar = [s for s in available if symbol.lower() in s.lower() or s.lower() in symbol.lower()]
                 
                 if similar:
-                    raise ValueError(f"Symbol {symbol} not found. Did you mean: {', '.join(similar)}?")
+                    raise ValueError(f"Symbol {search_symbol} not found. Did you mean: {', '.join(similar)}?")
                 else:
-                    raise ValueError(f"Symbol {symbol} not found. Available symbols: {', '.join(available[:10])}")
+                    raise ValueError(f"Symbol {search_symbol} not found. Available symbols: {', '.join(available[:10])}")
             
             # Load data if not cached
-            if symbol not in self.loaded_data:
-                file_path = self.available_files[symbol]
-                self.loaded_data[symbol] = self._load_csv_file(file_path)
+            if search_symbol not in self.loaded_data:
+                file_path = self.available_files[search_symbol]
+                self.loaded_data[search_symbol] = self._load_csv_file(file_path)
                 
-            data = self.loaded_data[symbol].copy()
+            data = self.loaded_data[search_symbol].copy()
             
             # Filter by date range
             if start_date:

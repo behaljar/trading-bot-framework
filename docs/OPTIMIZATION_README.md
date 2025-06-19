@@ -51,7 +51,7 @@ python scripts/optimize.py --strategy sma --symbol AAPL --data-source yahoo
 python scripts/optimize.py --strategy sma --symbol BTCUSDC --data-source ccxt
 
 # Use preprocessed CSV data
-python scripts/optimize.py --strategy sma --symbol ETHUSDC --data-source csv
+python scripts/optimize.py --strategy sma --symbol ETHUSDC --data-source csv_processed
 ```
 
 ### Optimization Metrics
@@ -225,8 +225,11 @@ python scripts/optimize.py --strategy sma --symbol AAPL --data-source yahoo
 # Crypto optimization  
 python scripts/optimize.py --strategy sma --symbol BTCUSDC --data-source ccxt
 
-# Forex or custom data
+# Custom CSV data (raw)
 python scripts/optimize.py --strategy sma --symbol EURUSD --data-source csv
+
+# Processed CSV data with features
+python scripts/optimize.py --strategy sma --symbol ETHUSDC --data-source csv_processed --timeframe 15m
 ```
 
 ## Interpreting Results

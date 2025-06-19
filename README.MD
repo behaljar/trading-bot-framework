@@ -134,6 +134,10 @@ python -m pytest --cov=trading_bot tests/
 ```bash
 # Run SMA strategy backtest on AAPL
 python scripts/run_backtest.py --strategy sma --symbol AAPL --start 2022-01-01 --end 2023-12-31
+
+# Use processed CSV data for backtesting
+python scripts/run_backtest.py --strategy sma --symbol ETHUSDC \
+  --data-source csv_processed --timeframe 15m --start 2024-06-16 --end 2024-06-20
 ```
 
 ### Paper Trading
@@ -171,6 +175,10 @@ python scripts/optimize.py --strategy sma --symbol AAPL
 python scripts/optimize.py --strategy sma --symbol AAPL \
   --short-window "10,30" --long-window "40,80" \
   --max-tries 100
+
+# Use processed CSV data with different timeframes
+python scripts/optimize.py --strategy sma --symbol ETHUSDC \
+  --data-source csv_processed --timeframe 15m
 ```
 
 **Features:**
