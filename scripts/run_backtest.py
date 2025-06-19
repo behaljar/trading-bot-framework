@@ -8,6 +8,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backtesting import Backtest, Strategy
 import pandas as pd
 from datetime import datetime, timedelta
+import json
+from pathlib import Path
 from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
@@ -226,6 +228,44 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
 
     results = bt.run()
 
+    # Create output filename with strategy, symbol, and timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
+    output_dir.mkdir(exist_ok=True)
+    
+    output_filename = f"{strategy_name}_{symbol}_{timestamp}"
+    
+    # Save results to JSON file
+    results_dict = {}
+    for key, value in results.items():
+        if isinstance(value, (int, float, str, bool)):
+            results_dict[key] = value
+        elif hasattr(value, 'isoformat'):  # datetime objects
+            results_dict[key] = value.isoformat()
+        else:
+            results_dict[key] = str(value)
+    
+    # Add metadata
+    results_dict['metadata'] = {
+        'strategy': strategy_name,
+        'symbol': symbol,
+        'start_date': start_date,
+        'end_date': end_date,
+        'data_source': config.data_source,
+        'timeframe': config.timeframe,
+        'data_points': len(data),
+        'date_range_start': data.index[0].isoformat(),
+        'date_range_end': data.index[-1].isoformat(),
+        'timestamp': datetime.now().isoformat(),
+        'no_sl_tp': no_sl_tp
+    }
+    
+    json_file = output_dir / f"{output_filename}_results.json"
+    with open(json_file, 'w') as f:
+        json.dump(results_dict, f, indent=2, default=str)
+    
+    logger.info(f"Results saved to: {json_file}")
+
     # Print all available results
     logger.info("=== BACKTEST RESULTS ===")
     for key, value in results.items():
@@ -241,16 +281,23 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     logger.info(f"Data points: {len(data)}")
     logger.info(f"Date range: {data.index[0]} to {data.index[-1]}")
 
-    # Show plot
+    # Save and show plot
     try:
-        bt.plot()
+        plot_file = output_dir / f"{output_filename}_plot.html"
+        bt.plot(filename=str(plot_file), open_browser=False)
+        logger.info(f"Plot saved to: {plot_file}")
     except Exception as e:
-        logger.warning(f"Could not display plot: {e}")
+        logger.warning(f"Could not save plot: {e}")
 
-    # Print trades for detailed analysis
+    # Save and print trades for detailed analysis
     try:
         trades = bt._results._trades
         if not trades.empty:
+            # Save trades to CSV
+            trades_file = output_dir / f"{output_filename}_trades.csv"
+            trades.to_csv(trades_file, index=False)
+            logger.info(f"Trades saved to: {trades_file}")
+            
             logger.info("\n=== TRADE DETAILS ===")
             for i, trade in trades.iterrows():
                 entry_time = trade['EntryTime']
@@ -273,6 +320,10 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
             logger.info("No trades executed")
     except Exception as e:
         logger.warning(f"Could not display trade details: {e}")
+    
+    logger.info(f"\nAll backtest outputs saved to: {output_dir}")
+    logger.info(f"Output files: {output_filename}_results.json, {output_filename}_plot.html" + 
+               (f", {output_filename}_trades.csv" if 'trades' in locals() and not trades.empty else ""))
     
     return results
 
