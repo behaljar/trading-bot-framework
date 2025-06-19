@@ -159,7 +159,38 @@ logger = setup_logger("INFO")
 logger.info("Your message here")
 ```
 
-## 📚 Recommended Resources
+## 📊 Strategy Optimization
+
+The framework includes a comprehensive optimization tool for finding optimal strategy parameters:
+
+```bash
+# Basic optimization
+python scripts/optimize.py --strategy sma --symbol AAPL
+
+# Custom parameter ranges with heatmap generation
+python scripts/optimize.py --strategy sma --symbol AAPL \
+  --short-window "10,30" --long-window "40,80" \
+  --max-tries 100
+```
+
+**Features:**
+- Multi-parameter optimization using Backtesting.py
+- Interactive and static heatmap generation
+- Support for multiple data sources and timeframes
+- Comprehensive output with timestamps and metadata
+
+**Documentation:**
+- [Complete Optimization Guide](docs/OPTIMIZATION_README.md)
+- [Quick Reference](docs/OPTIMIZE_QUICK_REFERENCE.md)
+
+## 📚 Documentation
+
+- [Strategy Optimization Guide](docs/OPTIMIZATION_README.md) - Parameter optimization and heatmaps
+- [Optimization Quick Reference](docs/OPTIMIZE_QUICK_REFERENCE.md) - Commands and examples
+- [Backtesting Guide](docs/BACKTESTING_README.md) - Single backtest runs
+- [Data Preprocessing Guide](docs/PREPROCESSING_README.md) - Data preparation
+
+## 📚 External Resources
 
 - [Backtesting.py documentation](https://kernc.github.io/backtesting.py/)
 - [pandas documentation](https://pandas.pydata.org/docs/)

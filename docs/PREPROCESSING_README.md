@@ -28,23 +28,29 @@ python scripts/preprocess_data.py --ticker AAPL --start 2023-01-01 --end 2023-12
 
 ### Different Timeframes
 ```bash
-# Weekly data
-python scripts/preprocess_data.py --ticker AAPL --timeframe 1W
+# 15-minute data (from 1-minute raw data)
+python scripts/preprocess_data.py --ticker ETHUSDC --timeframe 15m
 
 # Hourly data  
-python scripts/preprocess_data.py --ticker AAPL --timeframe 1H
+python scripts/preprocess_data.py --ticker AAPL --timeframe 1h
 
-# Monthly data
-python scripts/preprocess_data.py --ticker AAPL --timeframe 1M
+# 4-hour data
+python scripts/preprocess_data.py --ticker BTCUSDC --timeframe 4h
+
+# Daily data (default, no resampling needed)
+python scripts/preprocess_data.py --ticker AAPL --timeframe 1d
+
+# Weekly data
+python scripts/preprocess_data.py --ticker AAPL --timeframe 1w
 ```
 
 ### Combine Options
 ```bash
-# Process all tickers with weekly timeframe
-python scripts/preprocess_data.py --all --timeframe 1W
+# Process all tickers with 15-minute timeframe
+python scripts/preprocess_data.py --all --timeframe 15m
 
 # Date range with custom timeframe
-python scripts/preprocess_data.py --ticker AAPL --start 2023-01-01 --end 2023-12-31 --timeframe 4H
+python scripts/preprocess_data.py --ticker AAPL --start 2023-01-01 --end 2023-12-31 --timeframe 4h
 ```
 
 ## Input Data Format
@@ -70,14 +76,19 @@ AAPL,1,2023-01-01,100.0,105.0,99.0,104.0,1000000
 
 ## Timeframe Resampling
 
-The script can resample data to different timeframes:
+The script can resample high-frequency data (like 1-minute) to lower timeframes:
 
 ### Supported Timeframes
-- **Intraday**: `1H`, `4H`, `6H`, `12H`
-- **Daily**: `1D` (default, no resampling)
-- **Weekly**: `1W`
+- **Minutes**: `1m`, `5m`, `15m`, `30m`
+- **Hours**: `1h`, `2h`, `4h`, `6h`, `8h`, `12h`
+- **Daily**: `1d` (default, no resampling needed)
+- **Weekly**: `1w`
 - **Monthly**: `1M`
-- **Custom**: Any pandas-compatible frequency string
+
+**Note**: The script automatically converts common timeframe formats to pandas frequency codes:
+- `15m` → `15T` (15 minutes)
+- `1h` → `1H` (1 hour)
+- `1d` → `1D` (1 day)
 
 ### Resampling Rules
 - **Open**: First value in period
@@ -85,6 +96,20 @@ The script can resample data to different timeframes:
 - **Low**: Minimum value in period
 - **Close**: Last value in period
 - **Volume**: Sum of all volumes in period
+
+### Resampling Example
+When resampling 1-minute ETHUSDC data to 15-minute:
+```
+Input:  508,332 rows (1-minute data over ~353 days)
+Output:  33,900 rows (15-minute data, properly aggregated)
+```
+
+The script logs the resampling process:
+```
+INFO - Resampling data to 15m
+INFO - Using pandas frequency: 15T
+INFO - Resampled from 508332 to 33900 rows
+```
 
 ## Features Generated
 
@@ -179,7 +204,13 @@ def add_custom_features(self, df: pd.DataFrame, ticker: str) -> pd.DataFrame:
 ## Output Format
 
 Processed files are saved to `data/processed/` with the naming convention:
-- `{TICKER}_processed.csv`
+- `{TICKER}_processed.csv` (for default/daily timeframe)
+- `{TICKER}_{TIMEFRAME}_processed.csv` (for custom timeframes)
+
+Examples:
+- `AAPL_processed.csv` (daily data)
+- `ETHUSDC_15m_processed.csv` (15-minute data)
+- `BTCUSDC_1h_processed.csv` (hourly data)
 
 Each row contains:
 - Original OHLCV data
@@ -235,27 +266,51 @@ Your dataset is too small. Most features need 200+ rows of data.
 ### "Memory issues"
 Process tickers individually instead of using `--all` for large datasets.
 
+### "Only 2 rows after resampling"
+This was a bug in earlier versions where `15m` was interpreted as 15 months instead of 15 minutes. 
+- **Fixed**: The script now properly converts `15m` → `15T`
+- **Verify**: Check the log output shows "Using pandas frequency: 15T"
+- **Example**: `python scripts/preprocess_data.py --ticker ETHUSDC --timeframe 15m` should produce ~33,900 rows from 500K+ input rows
+
+### Wrong timeframe interpretation
+If you see unexpected date ranges or very few rows:
+- Use lowercase timeframe notation: `15m`, `1h`, `4h`, `1d`
+- Check the log output for "Using pandas frequency: ..." 
+- Supported formats: `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `1w`, `1M`
+
 ## Example Workflow
 
-1. **Generate sample data** (for testing):
+1. **Check raw data**:
    ```bash
-   python scripts/generate_sample_data.py
+   ls data/csv/
+   wc -l data/csv/ETHUSDC.csv  # Count rows in raw data
    ```
 
-2. **Preprocess all tickers**:
+2. **Preprocess with different timeframes**:
    ```bash
-   python scripts/preprocess_data.py --all
+   # Resample 1-minute data to 15-minute
+   python scripts/preprocess_data.py --ticker ETHUSDC --timeframe 15m
+   
+   # Resample to hourly
+   python scripts/preprocess_data.py --ticker ETHUSDC --timeframe 1h
+   
+   # Process daily data (no resampling)
+   python scripts/preprocess_data.py --ticker AAPL --timeframe 1d
    ```
 
 3. **Verify output**:
    ```bash
    ls data/processed/
-   head data/processed/AAPL_processed.csv
+   head data/processed/ETHUSDC_15m_processed.csv
+   
+   # Check row counts
+   wc -l data/processed/ETHUSDC_*_processed.csv
    ```
 
 4. **Use in strategy**:
    - Update your strategy to use the preprocessed features
    - Run backtests with the enriched data
+   - Use appropriate timeframe data for your strategy
 
 ## Next Steps
 
