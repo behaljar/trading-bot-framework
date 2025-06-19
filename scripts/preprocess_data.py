@@ -121,12 +121,33 @@ class DataPreprocessor:
         
         Args:
             df: DataFrame with OHLCV data
-            timeframe: Target timeframe (e.g., '1H', '4H', '1D', '1W', '1M')
+            timeframe: Target timeframe (e.g., '1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w')
             
         Returns:
             Resampled DataFrame
         """
         logger.info(f"Resampling data to {timeframe}")
+        
+        # Convert timeframe to pandas frequency
+        timeframe_mapping = {
+            '1m': '1T',
+            '5m': '5T', 
+            '15m': '15T',
+            '30m': '30T',
+            '1h': '1H',
+            '2h': '2H',
+            '4h': '4H',
+            '6h': '6H',
+            '8h': '8H',
+            '12h': '12H',
+            '1d': '1D',
+            '1w': '1W',
+            '1M': '1M'  # Monthly
+        }
+        
+        # Convert to pandas frequency format
+        pandas_freq = timeframe_mapping.get(timeframe.lower(), timeframe)
+        logger.info(f"Using pandas frequency: {pandas_freq}")
         
         # Define aggregation rules for OHLCV data
         agg_dict = {
@@ -145,10 +166,12 @@ class DataPreprocessor:
         resample_agg = {col: agg_dict[col] for col in available_cols}
         
         # Resample the data
-        resampled = df[available_cols].resample(timeframe).agg(resample_agg)
+        resampled = df[available_cols].resample(pandas_freq).agg(resample_agg)
         
         # Remove rows with NaN (incomplete periods)
         resampled = resampled.dropna()
+        
+        logger.info(f"Resampled from {len(df)} to {len(resampled)} rows")
         
         return resampled
     
