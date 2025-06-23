@@ -286,7 +286,12 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     # Save and show plot
     try:
         plot_file = output_dir / f"{output_filename}_plot.html"
-        bt.plot(filename=str(plot_file), open_browser=False)
+        # Try plotting without superimpose first (which causes issues with some timeframes)
+        try:
+            bt.plot(filename=str(plot_file), open_browser=True, superimpose=False)
+        except:
+            # If that fails, try with resample=False to avoid upsampling issues
+            bt.plot(filename=str(plot_file), open_browser=True, resample=False)
         logger.info(f"Plot saved to: {plot_file}")
     except Exception as e:
         logger.warning(f"Could not save plot: {e}")

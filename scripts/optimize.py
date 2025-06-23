@@ -328,23 +328,37 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         
         logger.info(f"\nAll optimization outputs saved to: {output_dir}")
         
-        # Clean up any stray HTML files created by plot_heatmaps() in current directory
-        script_dir = Path(__file__).parent
-        stray_files = ['optimize.html', 'heatmap.html', 'plot.html']
-        for stray_file in stray_files:
-            stray_path = script_dir / stray_file
-            if stray_path.exists():
-                stray_path.unlink()
-                logger.info(f"Cleaned up stray file: {stray_path}")
-        
         return optimization_result
         
     except Exception as e:
         logger.error(f"Optimization failed: {e}")
         return None
 
+def _move_stray_html_files(current_dir, output_dir, expected_filename, logger):
+    """Move any stray HTML files created by bokeh to the proper output directory"""
+    import shutil
+    from pathlib import Path
+    
+    # Common stray filenames that bokeh might create
+    stray_patterns = ['optimize.html', 'heatmap.html', 'plot.html', 'bokeh_plot.html']
+    
+    for pattern in stray_patterns:
+        stray_file = current_dir / pattern
+        if stray_file.exists():
+            try:
+                # Move to output directory with proper naming
+                target_file = output_dir / f"{expected_filename}.html"
+                shutil.move(str(stray_file), str(target_file))
+                logger.info(f"Moved stray file {stray_file} to {target_file}")
+            except Exception as e:
+                logger.warning(f"Could not move stray file {stray_file}: {e}")
+
 def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
     """Generate and save optimization heatmaps using backtesting.lib"""
+    import os
+    import shutil
+    from pathlib import Path
+    
     logger = setup_logger()
     
     try:
@@ -361,6 +375,9 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
         # Generate heatmaps using backtesting.lib plot_heatmaps
         # plot_heatmaps() creates interactive bokeh plots by default
         
+        # Get current working directory to check for stray files
+        current_dir = Path.cwd()
+        
         # Default heatmap (max aggregation)
         try:
             from bokeh.plotting import output_file, save, reset_output
@@ -375,6 +392,10 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
             if fig:
                 save(fig)
                 logger.info(f"Interactive heatmap saved to: {heatmap_html_file}")
+                
+                # Check for and move any stray HTML files created by bokeh
+                _move_stray_html_files(current_dir, output_dir, f"{output_filename}_heatmap_interactive", logger)
+                
         except Exception as e:
             logger.warning(f"Could not generate interactive heatmap: {e}")
         
@@ -392,6 +413,10 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
             if fig_mean:
                 save(fig_mean)
                 logger.info(f"Mean heatmap saved to: {heatmap_mean_file}")
+                
+                # Check for and move any stray HTML files created by bokeh
+                _move_stray_html_files(current_dir, output_dir, f"{output_filename}_heatmap_mean", logger)
+                
         except Exception as e:
             logger.warning(f"Could not generate mean heatmap: {e}")
         
@@ -401,6 +426,9 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
         except Exception as e:
             logger.warning(f"Could not generate static heatmaps: {e}")
         
+        # Final cleanup: check for any remaining stray HTML files
+        _move_stray_html_files(current_dir, output_dir, output_filename, logger)
+        
     except Exception as e:
         logger.warning(f"Could not generate heatmaps with plot_heatmaps: {e}")
         # Fallback to basic heatmap generation
@@ -408,6 +436,10 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
             generate_static_heatmaps(heatmap_series, metric, output_dir, output_filename)
         except Exception as e2:
             logger.warning(f"Could not generate basic heatmap either: {e2}")
+        
+        # Final cleanup even in fallback case
+        current_dir = Path.cwd()
+        _move_stray_html_files(current_dir, output_dir, output_filename, logger)
 
 def generate_static_heatmaps(heatmap_series, metric, output_dir, output_filename):
     """Generate static PNG heatmaps using matplotlib/seaborn"""
