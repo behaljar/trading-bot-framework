@@ -25,6 +25,7 @@ from utils.logger import setup_logger
 _strategy_class = None
 _data = None
 _optimization_params = None
+_symbol = None
 
 class OptimizationWrapper(Strategy):
     def init(self):
@@ -85,7 +86,7 @@ class OptimizationWrapper(Strategy):
                 if not self.position:
                     current_account_value = self.equity
                     risk_amount = current_account_value * 0.01  # 1% risk
-                    
+
                     if stop_loss and stop_loss > 0:
                         risk_per_share = current_price - stop_loss
                         if risk_per_share > 0:
@@ -101,7 +102,7 @@ class OptimizationWrapper(Strategy):
                 if not self.position:
                     current_account_value = self.equity
                     risk_amount = current_account_value * 0.01  # 1% risk
-                    
+
                     if stop_loss and stop_loss > 0:
                         risk_per_share = stop_loss - current_price
                         if risk_per_share > 0:
@@ -172,15 +173,8 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         logger.error(f"Failed to load data for {symbol} from {config.data_source}")
         return None
     
-    # Convert to microBTC for fractional trading if dealing with BTC data
-    if 'BTC' in symbol.upper():
-        logger.info("Converting prices to microBTC for fractional trading")
-        price_columns = ['Open', 'High', 'Low', 'Close']
-        for col in price_columns:
-            if col in data.columns:
-                data[col] = data[col] / 1e6
-        if 'Volume' in data.columns:
-            data['Volume'] = data['Volume'] * 1e6
+    # No microBTC conversion for optimization - keep original prices like run_backtest.py
+    # The backtesting library will handle fractional trading internally
 
     # Log available feature columns
     feature_columns = [col for col in data.columns if col not in ['Open', 'High', 'Low', 'Close', 'Volume']]
@@ -188,7 +182,7 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         logger.info(f"Found additional feature columns: {', '.join(feature_columns)}")
 
     # Select strategy and set global variables for optimization wrapper
-    global _strategy_class, _data, _optimization_params
+    global _strategy_class, _data, _optimization_params, _symbol
     
     if strategy_name.lower() in ["sma", "sma_crossover", "trend_following"]: 
         _strategy_class = SMAStrategy
@@ -200,6 +194,7 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
 
     _data = data
     _optimization_params = optimization_params
+    _symbol = symbol
 
     # Add optimization parameters as class attributes
     for param_name in optimization_params.keys():

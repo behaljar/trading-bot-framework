@@ -138,7 +138,8 @@ class CSVDataSource(DataSource):
                     raise ValueError("No date column found. Expected columns: Date, Datetime, or Timestamp")
             
             # Convert date column to datetime and set as index
-            df[date_col] = pd.to_datetime(df[date_col])
+            # Handle mixed timezone data by forcing UTC interpretation
+            df[date_col] = pd.to_datetime(df[date_col], utc=True)
             df.set_index(date_col, inplace=True)
             df.index.name = 'timestamp'
             
@@ -225,9 +226,15 @@ class CSVDataSource(DataSource):
             # Filter by date range
             if start_date:
                 start_dt = pd.to_datetime(start_date)
+                # Make timezone-aware if data index is timezone-aware
+                if data.index.tz is not None:
+                    start_dt = start_dt.tz_localize('UTC')
                 data = data[data.index >= start_dt]
             if end_date:
                 end_dt = pd.to_datetime(end_date)
+                # Make timezone-aware if data index is timezone-aware
+                if data.index.tz is not None:
+                    end_dt = end_dt.tz_localize('UTC')
                 data = data[data.index <= end_dt]
                 
             return data
