@@ -185,6 +185,9 @@ class DataPreprocessor:
         """
         logger.info("Adding basic features...")
 
+        df['Return'] = df['Close'].pct_change()
+        
+
         return df
 
     
