@@ -32,8 +32,6 @@ class SMAStrategy(BaseStrategy):
             window=self.params['long_window']
         ).mean()
 
-        data['Volume_SMA'] = data['Volume'].rolling(window=20).mean()
-
         return data
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -43,8 +41,6 @@ class SMAStrategy(BaseStrategy):
         short_ma = data_with_indicators[f'SMA_{self.params["short_window"]}']
         long_ma = data_with_indicators[f'SMA_{self.params["long_window"]}']
         close_prices = data['Close']
-        volume = data['Volume']
-        volume_sma = data_with_indicators['Volume_SMA']
 
         # Initialize result DataFrame
         result = pd.DataFrame(index=data.index)
@@ -53,7 +49,7 @@ class SMAStrategy(BaseStrategy):
         result['take_profit'] = None
 
         # BUY signal: short MA crosses above long MA with volume confirmation
-        buy_condition = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1)) & (volume > volume_sma * 1.2)
+        buy_condition = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
         result.loc[buy_condition, 'signal'] = Signal.BUY.value
         
         # For buy signals, set stop loss below entry and take profit above
@@ -64,7 +60,7 @@ class SMAStrategy(BaseStrategy):
             result.loc[idx, 'take_profit'] = entry_price * (1 + self.params['take_profit_pct'] / 100)
 
         # SELL signal: short MA crosses below long MA with volume confirmation
-        sell_condition = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1)) & (volume > volume_sma * 1.2)
+        sell_condition = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
         result.loc[sell_condition, 'signal'] = Signal.SELL.value
             
         # For sell signals (short), set stop loss above entry and take profit below
