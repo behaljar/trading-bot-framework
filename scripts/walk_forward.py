@@ -22,6 +22,7 @@ from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
 from strategies.mean_reversion import RSIStrategy
 from strategies.sma_position import SMAPositionStrategy
+from strategies.breakout_strategy import BreakoutStrategy
 from utils.logger import setup_logger
 from scripts.optimize import OptimizationWrapper, optimize_strategy, _strategy_class, _data, _optimization_params, _symbol
 
@@ -177,13 +178,13 @@ def run_walk_forward_optimization(strategy_name: str, symbol: str, start_date: s
     efficiency_stats = calculate_walk_forward_efficiency(walk_forward_results, metric)
     
     # Save results
-    results_dict = save_walk_forward_results(
+    results_dict, output_dir = save_walk_forward_results(
         walk_forward_results, efficiency_stats, strategy_name, symbol,
         train_period, test_period, optimization_params, config
     )
     
     # Generate plots
-    generate_walk_forward_plots(walk_forward_results, efficiency_stats, metric)
+    generate_walk_forward_plots(walk_forward_results, efficiency_stats, metric, output_dir)
     
     # Print summary
     print_walk_forward_summary(efficiency_stats, metric)
@@ -235,7 +236,56 @@ def run_backtest_with_params(strategy_name, data, params, config):
     """Run backtest with specific parameters"""
     from backtesting import Strategy
     
-    # Create a custom strategy class for walk-forward testing
+    # Handle breakout strategy differently
+    if strategy_name.lower() in ['breakout', 'breakout_strategy']:
+        # Add fixed parameters that aren't being optimized
+        full_params = params.copy()
+        if 'atr_period' not in full_params:
+            full_params['atr_period'] = 14
+        if 'atr_multiplier' not in full_params:
+            full_params['atr_multiplier'] = 2.0
+            
+        # Use the actual breakout strategy with its logic
+        strategy_instance = BreakoutStrategy(full_params)
+        data_with_indicators = strategy_instance.add_indicators(data)
+        
+        class WalkForwardBreakoutStrategy(Strategy):
+            def init(self):
+                # Convert backtesting data to DataFrame for strategy
+                df_data = pd.DataFrame({
+                    'Open': self.data.Open,
+                    'High': self.data.High,
+                    'Low': self.data.Low,
+                    'Close': self.data.Close,
+                    'Volume': self.data.Volume
+                })
+                df_data.index = self.data.index
+                
+                # Add indicators from the strategy
+                for col in data_with_indicators.columns:
+                    if col not in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                        df_data[col] = data_with_indicators[col]
+                
+                # Generate signals once
+                self.signals = strategy_instance.generate_signals(df_data)
+                
+            def next(self):
+                current_idx = len(self.data.Close) - 1
+                if current_idx >= len(self.signals):
+                    return
+                    
+                signal = self.signals.iloc[current_idx]['signal']
+                stop_loss = self.signals.iloc[current_idx].get('stop_loss', None)
+                
+                # Long-only logic for breakout
+                if signal == 1 and not self.position:
+                    self.buy(sl=stop_loss)
+                elif signal == -1 and self.position and self.position.is_long:
+                    self.position.close()
+                    
+        return run_backtest_with_strategy_class(data, WalkForwardBreakoutStrategy, config)
+    
+    # Original logic for other strategies
     class WalkForwardTestStrategy(Strategy):
         # Add parameters dynamically
         short_window = params.get('short_window', 20)
@@ -278,9 +328,13 @@ def run_backtest_with_params(strategy_name, data, params, config):
                     self.sell()
     
     # Run backtest with the position-based strategy
+    return run_backtest_with_strategy_class(data, WalkForwardTestStrategy, config)
+
+def run_backtest_with_strategy_class(data, strategy_class, config):
+    """Helper to run backtest with a given strategy class"""
     bt = Backtest(
         data,
-        WalkForwardTestStrategy,
+        strategy_class,
         cash=config.initial_capital,
         commission=config.commission,
         trade_on_close=True,
@@ -328,8 +382,9 @@ def save_walk_forward_results(results, efficiency_stats, strategy_name, symbol,
                              train_period, test_period, optimization_params, config):
     """Save walk-forward results to JSON file"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
-    output_dir.mkdir(exist_ok=True)
+    run_dir = f"walk_forward_{strategy_name}_{symbol}_{timestamp}"
+    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "walk_forward" / run_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     output_filename = f"walk_forward_{strategy_name}_{symbol}_{timestamp}"
     
@@ -377,12 +432,11 @@ def save_walk_forward_results(results, efficiency_stats, strategy_name, symbol,
         json.dump(results_dict, f, indent=2, default=str)
     
     setup_logger().info(f"Walk-forward results saved to: {json_file}")
-    return results_dict
+    return results_dict, output_dir
 
-def generate_walk_forward_plots(results, efficiency_stats, metric):
+def generate_walk_forward_plots(results, efficiency_stats, metric, output_dir):
     """Generate walk-forward analysis plots"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Extract data for plotting
     windows = [r['window'] for r in results]
@@ -501,6 +555,12 @@ if __name__ == "__main__":
     parser.add_argument('--long-window', help='SMA long window range (e.g., "20,100" or "50,60,70")')
     parser.add_argument('--stop-loss', help='Stop loss percentage range (e.g., "1,5" or "2,3,4")')
     parser.add_argument('--take-profit', help='Take profit percentage range (e.g., "2,10" or "4,6,8")')
+    
+    # Breakout strategy parameters
+    parser.add_argument('--entry-lookback', help='Entry lookback period range (e.g., "10,30" or "15,20,25")')
+    parser.add_argument('--exit-lookback', help='Exit lookback period range (e.g., "5,15" or "8,10,12")')
+    parser.add_argument('--atr-period', help='ATR period range (e.g., "10,20" or "12,14,16")')
+    parser.add_argument('--atr-multiplier', help='ATR multiplier range (e.g., "1.5,3.0" or "2.0,2.5,3.0")')
 
     args = parser.parse_args()
 
@@ -543,6 +603,45 @@ if __name__ == "__main__":
                 optimization_params['take_profit_pct'] = (float(values[0]), float(values[1]))
             else:
                 optimization_params['take_profit_pct'] = [float(v) for v in values]
+    
+    elif args.strategy.lower() in ["breakout", "breakout_strategy"]:
+        if args.entry_lookback:
+            values = args.entry_lookback.split(',')
+            if len(values) == 2:
+                optimization_params['entry_lookback'] = (int(values[0]), int(values[1]))
+            else:
+                optimization_params['entry_lookback'] = [int(v) for v in values]
+        else:
+            optimization_params['entry_lookback'] = (10, 30)
+            
+        if args.exit_lookback:
+            values = args.exit_lookback.split(',')
+            if len(values) == 2:
+                optimization_params['exit_lookback'] = (int(values[0]), int(values[1]))
+            else:
+                optimization_params['exit_lookback'] = [int(v) for v in values]
+        else:
+            optimization_params['exit_lookback'] = (5, 15)
+            
+        if args.atr_period:
+            values = args.atr_period.split(',')
+            if len(values) == 2:
+                optimization_params['atr_period'] = (int(values[0]), int(values[1]))
+            elif len(values) == 1:
+                # Fixed parameter - don't optimize
+                pass
+            else:
+                optimization_params['atr_period'] = [int(v) for v in values]
+        
+        if args.atr_multiplier:
+            values = args.atr_multiplier.split(',')
+            if len(values) == 2:
+                optimization_params['atr_multiplier'] = (float(values[0]), float(values[1]))
+            elif len(values) == 1:
+                # Fixed parameter - don't optimize
+                pass
+            else:
+                optimization_params['atr_multiplier'] = [float(v) for v in values]
     
     if not optimization_params:
         print(f"No optimization parameters defined for strategy: {args.strategy}")

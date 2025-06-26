@@ -250,8 +250,12 @@ def main():
         )
         
         # Find the most recent results file
-        output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
-        results_files = list(output_dir.glob(f"{strategy}_{symbol}_*_results.json"))
+        base_output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "backtests"
+        results_files = []
+        # Search through all subdirectories
+        for subdir in base_output_dir.glob("*"):
+            if subdir.is_dir():
+                results_files.extend(subdir.glob(f"{strategy}_{symbol}_*_results.json"))
         results_path = str(max(results_files, key=os.path.getctime))
     
     # Step 2: Extract trades
@@ -271,7 +275,9 @@ def main():
     
     # Step 4: Save results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
+    run_dir = f"monte_carlo_{strategy}_{symbol}_{timestamp}"
+    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "monte_carlo" / run_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Extract strategy and symbol from results path if using existing
     if args.use_existing:

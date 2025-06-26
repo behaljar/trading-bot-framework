@@ -19,6 +19,7 @@ from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
 from strategies.mean_reversion import RSIStrategy
+from strategies.breakout_strategy import BreakoutStrategy
 from utils.logger import setup_logger
 
 # Global variables for optimization wrapper
@@ -98,8 +99,16 @@ class OptimizationWrapper(Strategy):
                         units = max(1, int(target_value / current_price))
                         self.buy(size=units)
 
-            elif signal == -1:  # Sell signal (short)
-                if not self.position:
+            elif signal == -1:  # Sell signal
+                # Check if this is a long-only strategy (like breakout)
+                is_long_only_strategy = _strategy_class.__name__ == 'BreakoutStrategy'
+                
+                if is_long_only_strategy:
+                    # For long-only strategies, only close existing long positions
+                    if self.position and self.position.is_long:
+                        self.position.close()
+                elif not self.position:
+                    # Original short-selling logic for other strategies
                     current_account_value = self.equity
                     risk_amount = current_account_value * 0.01  # 1% risk
 
@@ -188,6 +197,8 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         _strategy_class = SMAStrategy
     elif strategy_name.lower() in ["rsi", "rsi_mean_reversion"]:
         _strategy_class = RSIStrategy
+    elif strategy_name.lower() in ["breakout", "breakout_strategy"]:
+        _strategy_class = BreakoutStrategy
     else:
         logger.error(f"Unknown strategy: {strategy_name}")
         return None
@@ -255,8 +266,9 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         
         # Create output filename with strategy, symbol, and timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
-        output_dir.mkdir(exist_ok=True)
+        run_dir = f"optimize_{strategy_name}_{symbol}_{timestamp}"
+        output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "optimizations" / run_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
         
         output_filename = f"optimize_{strategy_name}_{symbol}_{timestamp}"
         
@@ -576,6 +588,12 @@ if __name__ == "__main__":
                 optimization_params['take_profit_pct'] = (float(values[0]), float(values[1]))
             else:
                 optimization_params['take_profit_pct'] = [float(v) for v in values]
+    
+    elif args.strategy.lower() in ["breakout", "breakout_strategy"]:
+        optimization_params['entry_lookback'] = (10, 30)
+        optimization_params['exit_lookback'] = (3, 15)  
+        optimization_params['atr_period'] = (10, 20)
+        optimization_params['atr_multiplier'] = (1.0, 3.0)
     
     # Add more strategy parameter definitions here as needed
     

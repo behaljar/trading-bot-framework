@@ -10,6 +10,7 @@ from config.settings import load_config, TradingConfig
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
 from strategies.mean_reversion import RSIStrategy
+from strategies.breakout_strategy import BreakoutStrategy
 from risk.risk_manager import RiskManager
 from execution.paper_trader import PaperTrader
 from utils.logger import setup_logger
@@ -44,6 +45,8 @@ def main() -> None:
         strategy = SMAStrategy(config.strategy_params)
     elif config.strategy_name.lower() in ["rsi", "mean_reversion"]:
         strategy = RSIStrategy(config.strategy_params)
+    elif config.strategy_name.lower() in ["breakout", "breakout_strategy"]:
+        strategy = BreakoutStrategy(config.strategy_params)
     else:
         # Default to SMA if unknown strategy
         logger.warning(f"Unknown strategy {config.strategy_name}, defaulting to SMA")

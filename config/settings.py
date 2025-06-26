@@ -64,17 +64,32 @@ class TradingConfig:
 
         # Load strategy parameters from environment variables
         if self.strategy_params is None:
-            short_window = int(get_env_value("STRATEGY_SHORT_WINDOW", "20"))
-            long_window = int(get_env_value("STRATEGY_LONG_WINDOW", "50"))
-            stop_loss_pct = float(get_env_value("STRATEGY_STOP_LOSS_PCT", "2.0"))
-            take_profit_pct = float(get_env_value("STRATEGY_TAKE_PROFIT_PCT", "4.0"))
-            
-            self.strategy_params = {
-                "short_window": short_window, 
-                "long_window": long_window,
-                "stop_loss_pct": stop_loss_pct,
-                "take_profit_pct": take_profit_pct
-            }
+            if self.strategy_name.lower() in ["breakout", "breakout_strategy"]:
+                # Breakout strategy parameters
+                entry_lookback = int(get_env_value("STRATEGY_ENTRY_LOOKBACK", "20"))
+                exit_lookback = int(get_env_value("STRATEGY_EXIT_LOOKBACK", "10"))
+                atr_period = int(get_env_value("STRATEGY_ATR_PERIOD", "14"))
+                atr_multiplier = float(get_env_value("STRATEGY_ATR_MULTIPLIER", "2.0"))
+                
+                self.strategy_params = {
+                    "entry_lookback": entry_lookback,
+                    "exit_lookback": exit_lookback,
+                    "atr_period": atr_period,
+                    "atr_multiplier": atr_multiplier
+                }
+            else:
+                # SMA and other strategy parameters
+                short_window = int(get_env_value("STRATEGY_SHORT_WINDOW", "20"))
+                long_window = int(get_env_value("STRATEGY_LONG_WINDOW", "50"))
+                stop_loss_pct = float(get_env_value("STRATEGY_STOP_LOSS_PCT", "2.0"))
+                take_profit_pct = float(get_env_value("STRATEGY_TAKE_PROFIT_PCT", "4.0"))
+                
+                self.strategy_params = {
+                    "short_window": short_window, 
+                    "long_window": long_window,
+                    "stop_loss_pct": stop_loss_pct,
+                    "take_profit_pct": take_profit_pct
+                }
 
 def load_config() -> TradingConfig:
     """Load configuration from file"""

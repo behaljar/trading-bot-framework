@@ -14,6 +14,7 @@ from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
 from strategies.mean_reversion import RSIStrategy
+from strategies.breakout_strategy import BreakoutStrategy
 from utils.logger import setup_logger
 
 def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str, data_source: str = None, timeframe: str = None, debug: bool = False, no_sl_tp: bool = False):
@@ -82,6 +83,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
         strategy_class = SMAStrategy
     elif strategy_name.lower() in ["rsi", "rsi_mean_reversion"]:
         strategy_class = RSIStrategy
+    elif strategy_name.lower() in ["breakout", "breakout_strategy"]:
+        strategy_class = BreakoutStrategy
     else:
         logger.error(f"Unknown strategy: {strategy_name}")
         return None
@@ -143,6 +146,9 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                 print(f"Day {current_idx}: Signal={signal}, Price={current_price:.2f}{price_unit}, Position={pos_info}")
 
             if current_idx < len(self.signals):
+                # For breakout strategy (long-only), sell signals only close positions
+                is_long_only_strategy = strategy_instance.__class__.__name__ == 'BreakoutStrategy'
+                
                 # Close any existing position first if signal changes direction
                 if self.position and (
                     (signal == 1 and self.position.is_short) or 
@@ -184,8 +190,14 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                                     print(f"  Buying: {units} units @ {current_price:.2f}{price_unit} (no SL)")
                                 self.buy(size=units)
 
-                elif signal == -1:  # Sell signal (short)
-                    if not self.position:
+                elif signal == -1:  # Sell signal
+                    # For long-only strategies, only close existing long positions
+                    if is_long_only_strategy:
+                        if self.position and self.position.is_long:
+                            if debug:
+                                print(f"  Closing long position: {self.position}")
+                            self.position.close()
+                    elif not self.position:  # Original short-selling logic for other strategies
                         current_account_value = self.equity
                         risk_amount = current_account_value * 0.01  # 1% risk
 
@@ -232,8 +244,9 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
 
     # Create output filename with strategy, symbol, and timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output"
-    output_dir.mkdir(exist_ok=True)
+    run_dir = f"{strategy_name}_{symbol}_{timestamp}"
+    output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "backtests" / run_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     output_filename = f"{strategy_name}_{symbol}_{timestamp}"
     
