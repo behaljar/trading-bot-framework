@@ -21,8 +21,7 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     """Run backtest for given strategy and symbol with flexible data sources"""
 
     config = load_config()
-    import logging
-    logger = logging.getLogger("TradingBot")
+    logger = setup_logger(config.log_level)
 
     # Use specified data source or config default
     if data_source:

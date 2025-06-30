@@ -181,9 +181,19 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
     if data.empty:
         logger.error(f"Failed to load data for {symbol} from {config.data_source}")
         return None
-    
-    # No microBTC conversion for optimization - keep original prices like run_backtest.py
-    # The backtesting library will handle fractional trading internally
+
+    # Convert to microBTC for fractional trading if dealing with BTC data
+    # BUT only if we're NOT using preprocessed data (which is already in microBTC)
+    if 'BTC' in symbol.upper():
+        logger.info("Converting prices to microBTC for fractional trading")
+        # Convert OHLC prices to microBTC (divide by 1e6)
+        price_columns = ['Open', 'High', 'Low', 'Close']
+        for col in price_columns:
+            if col in data.columns:
+                data[col] = data[col] / 1e6
+        # Adjust volume (multiply by 1e6 to compensate)
+        if 'Volume' in data.columns:
+            data['Volume'] = data['Volume'] * 1e6
 
     # Log available feature columns
     feature_columns = [col for col in data.columns if col not in ['Open', 'High', 'Low', 'Close', 'Volume']]
@@ -228,23 +238,36 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
     
     # Convert optimization parameters to the format expected by backtesting library
     opt_kwargs = {}
+    total_combinations = 1
     for param_name, param_range in optimization_params.items():
         if isinstance(param_range, (list, tuple)) and len(param_range) >= 2:
             if len(param_range) == 2:
                 # Range format: (start, end) - create range with reasonable step
                 start, end = param_range
                 if isinstance(start, int) and isinstance(end, int):
-                    opt_kwargs[param_name] = list(range(start, end + 1, max(1, (end - start) // 10)))
+                    values = list(range(start, end + 1, max(1, (end - start) // 10)))
+                    opt_kwargs[param_name] = values
                 else:
                     # For float ranges, create reasonable steps
                     step = (end - start) / 10
-                    opt_kwargs[param_name] = [round(x, 2) for x in np.arange(start, end + step/2, step)]
+                    values = [round(x, 2) for x in np.arange(start, end + step/2, step)]
+                    opt_kwargs[param_name] = values
             else:
                 # List of specific values
-                opt_kwargs[param_name] = list(param_range)
+                values = list(param_range)
+                opt_kwargs[param_name] = values
+            
+            total_combinations *= len(opt_kwargs[param_name])
+            logger.info(f"Parameter {param_name}: {len(opt_kwargs[param_name])} values {opt_kwargs[param_name]}")
         else:
             logger.warning(f"Invalid range for parameter {param_name}: {param_range}")
             continue
+    
+    logger.info(f"Total parameter combinations to test: {total_combinations}")
+    if max_tries and max_tries < total_combinations:
+        logger.info(f"Will test {max_tries} random combinations out of {total_combinations}")
+    else:
+        logger.info("Will test all combinations")
     
     try:
         optimization_result = bt.optimize(
@@ -592,10 +615,11 @@ if __name__ == "__main__":
                 optimization_params['take_profit_pct'] = [float(v) for v in values]
     
     elif args.strategy.lower() in ["breakout", "breakout_strategy"]:
-        optimization_params['entry_lookback'] = (10, 30)
-        optimization_params['exit_lookback'] = (3, 15)  
-        optimization_params['atr_period'] = (10, 20)
-        optimization_params['atr_multiplier'] = (1.0, 3.0)
+        optimization_params['entry_lookback'] = (20, 30)
+        optimization_params['exit_lookback'] = (10, 15)
+        optimization_params['atr_multiplier'] = (3, 4, 5)
+        optimization_params['volume_roc_threshold'] = (0.5, 0.75, 1.0)
+        optimization_params['trend_strength_threshold'] = (0.05, 0.1, 0.15)
     
     # Add more strategy parameter definitions here as needed
     

@@ -121,7 +121,8 @@ class CCXTSource(DataSource):
             df.set_index('timestamp', inplace=True)
 
             # Filter by end_date
-            df = df[df.index <= end_date]
+            end_dt = pd.to_datetime(end_date)
+            df = df[df.index <= end_dt]
 
             # Remove duplicates
             df = df[~df.index.duplicated(keep='last')]

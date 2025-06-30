@@ -1,5 +1,5 @@
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 yfinance>=0.2.18
 backtesting>=0.3.3
 bokeh>=3.0.0
@@ -14,3 +14,4 @@ pytest>=7.4.0
 pytest-cov>=4.0.0
 matplotlib>=3.10.3
 seaborn>=0.13.2
+pandas-ta>=0.3.14b
