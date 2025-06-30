@@ -1,8 +1,10 @@
 """
-High/Low Breakout Trend-Following Strategy
-Entry: Price breaks above 20-period high
-Exit: Price breaks below 10-period low
-Stop Loss: 2 x ATR below entry price
+High/Low Breakout Trend-Following Strategy (Long and Short)
+Long Entry: Price breaks above 20-period high
+Long Exit: Price breaks below 10-period low
+Short Entry: Price breaks below 20-period low
+Short Exit: Price breaks above 10-period high
+Stop Loss: 2 x ATR from entry price
 """
 import pandas as pd
 import numpy as np
@@ -15,15 +17,15 @@ class BreakoutStrategy(BaseStrategy):
 
     def __init__(self, params: Dict[str, Any] = None):
         default_params = {
-            "entry_lookback": 20,  # Look back period for entry (high breakout)
-            "exit_lookback": 10,   # Look back period for exit (low breakout)
+            "entry_lookback": 20,  # Look back period for entry (high/low breakout)
+            "exit_lookback": 10,   # Look back period for exit (high/low breakout)
             "atr_period": 14,      # ATR calculation period
-            "atr_multiplier": 2.0, # Stop loss = entry - (ATR * multiplier)
+            "atr_multiplier": 2.0, # Stop loss = entry +/- (ATR * multiplier)
         }
         if params:
             default_params.update(params)
         super().__init__(default_params)
-        self.in_position = False
+        self.position_type = None  # 'long', 'short', or None
         self.entry_price = None
 
     def get_strategy_name(self) -> str:
@@ -49,9 +51,18 @@ class BreakoutStrategy(BaseStrategy):
         """Adds breakout levels and ATR"""
         data = data.copy()
         
-        # Calculate rolling highs and lows
+        # Calculate rolling highs and lows for entries
         data[f'High_{self.params["entry_lookback"]}'] = data['High'].rolling(
             window=self.params['entry_lookback']
+        ).max()
+        
+        data[f'Low_{self.params["entry_lookback"]}'] = data['Low'].rolling(
+            window=self.params['entry_lookback']
+        ).min()
+        
+        # Calculate rolling highs and lows for exits
+        data[f'High_{self.params["exit_lookback"]}'] = data['High'].rolling(
+            window=self.params['exit_lookback']
         ).max()
         
         data[f'Low_{self.params["exit_lookback"]}'] = data['Low'].rolling(
@@ -64,7 +75,7 @@ class BreakoutStrategy(BaseStrategy):
         return data
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Generates breakout signals with ATR-based stop loss"""
+        """Generates breakout signals with ATR-based stop loss for both long and short"""
         data_with_indicators = self.add_indicators(data)
         
         close_prices = data['Close']
@@ -72,8 +83,10 @@ class BreakoutStrategy(BaseStrategy):
         low_prices = data['Low']
         
         # Get indicators
-        prev_high = data_with_indicators[f'High_{self.params["entry_lookback"]}'].shift(1)
-        prev_low = data_with_indicators[f'Low_{self.params["exit_lookback"]}'].shift(1)
+        prev_high_entry = data_with_indicators[f'High_{self.params["entry_lookback"]}'].shift(1)
+        prev_low_entry = data_with_indicators[f'Low_{self.params["entry_lookback"]}'].shift(1)
+        prev_high_exit = data_with_indicators[f'High_{self.params["exit_lookback"]}'].shift(1)
+        prev_low_exit = data_with_indicators[f'Low_{self.params["exit_lookback"]}'].shift(1)
         atr = data_with_indicators['ATR']
         
         # Initialize result DataFrame
@@ -83,7 +96,7 @@ class BreakoutStrategy(BaseStrategy):
         result['take_profit'] = None
         
         # Track position state
-        in_position = False
+        position_type = None  # 'long', 'short', or None
         entry_price = None
         stop_loss_price = None
         
@@ -95,36 +108,66 @@ class BreakoutStrategy(BaseStrategy):
             current_high = high_prices.iloc[i]
             current_low = low_prices.iloc[i]
             
-            if not in_position:
-                # Entry condition: price breaks above previous 20-period high
-                if not pd.isna(prev_high.iloc[i]) and current_high > prev_high.iloc[i]:
+            if position_type is None:
+                # Long entry: price breaks above previous 20-period high
+                if not pd.isna(prev_high_entry.iloc[i]) and current_high > prev_high_entry.iloc[i]:
                     result.loc[result.index[i], 'signal'] = Signal.BUY.value
                     entry_price = current_close
+                    position_type = 'long'
                     
                     # Set stop loss at 2 x ATR below entry
                     if not pd.isna(atr.iloc[i]):
                         stop_loss_price = entry_price - (atr.iloc[i] * self.params['atr_multiplier'])
                         result.loc[result.index[i], 'stop_loss'] = stop_loss_price
+                
+                # Short entry: price breaks below previous 20-period low
+                elif not pd.isna(prev_low_entry.iloc[i]) and current_low < prev_low_entry.iloc[i]:
+                    result.loc[result.index[i], 'signal'] = Signal.SELL.value
+                    entry_price = current_close
+                    position_type = 'short'
                     
-                    in_position = True
+                    # Set stop loss at 2 x ATR above entry
+                    if not pd.isna(atr.iloc[i]):
+                        stop_loss_price = entry_price + (atr.iloc[i] * self.params['atr_multiplier'])
+                        result.loc[result.index[i], 'stop_loss'] = stop_loss_price
                     
-            else:  # in_position
-                # Update stop loss for existing position
+            elif position_type == 'long':
+                # Update stop loss for long position
                 if not pd.isna(atr.iloc[i]) and entry_price is not None:
                     stop_loss_price = entry_price - (atr.iloc[i] * self.params['atr_multiplier'])
                     result.loc[result.index[i], 'stop_loss'] = stop_loss_price
                 
                 # Exit condition 1: price goes below previous 10-period low
-                if not pd.isna(prev_low.iloc[i]) and current_low < prev_low.iloc[i]:
+                if not pd.isna(prev_low_exit.iloc[i]) and current_low < prev_low_exit.iloc[i]:
                     result.loc[result.index[i], 'signal'] = Signal.SELL.value
-                    in_position = False
+                    position_type = None
                     entry_price = None
                     stop_loss_price = None
                     
                 # Exit condition 2: stop loss hit
                 elif stop_loss_price is not None and current_low <= stop_loss_price:
                     result.loc[result.index[i], 'signal'] = Signal.SELL.value
-                    in_position = False
+                    position_type = None
+                    entry_price = None
+                    stop_loss_price = None
+                    
+            elif position_type == 'short':
+                # Update stop loss for short position
+                if not pd.isna(atr.iloc[i]) and entry_price is not None:
+                    stop_loss_price = entry_price + (atr.iloc[i] * self.params['atr_multiplier'])
+                    result.loc[result.index[i], 'stop_loss'] = stop_loss_price
+                
+                # Exit condition 1: price goes above previous 10-period high
+                if not pd.isna(prev_high_exit.iloc[i]) and current_high > prev_high_exit.iloc[i]:
+                    result.loc[result.index[i], 'signal'] = Signal.BUY.value
+                    position_type = None
+                    entry_price = None
+                    stop_loss_price = None
+                    
+                # Exit condition 2: stop loss hit
+                elif stop_loss_price is not None and current_high >= stop_loss_price:
+                    result.loc[result.index[i], 'signal'] = Signal.BUY.value
+                    position_type = None
                     entry_price = None
                     stop_loss_price = None
         

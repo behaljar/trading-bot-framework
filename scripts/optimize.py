@@ -100,8 +100,8 @@ class OptimizationWrapper(Strategy):
                         self.buy(size=units)
 
             elif signal == -1:  # Sell signal
-                # Check if this is a long-only strategy (like breakout)
-                is_long_only_strategy = _strategy_class.__name__ == 'BreakoutStrategy'
+                # Check if this is a long-only strategy (none currently)
+                is_long_only_strategy = False
                 
                 if is_long_only_strategy:
                     # For long-only strategies, only close existing long positions
@@ -365,8 +365,9 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
     import os
     import shutil
     from pathlib import Path
+    import logging
     
-    logger = setup_logger()
+    logger = logging.getLogger("TradingBot")
     
     try:
         # Save heatmap data to CSV for reference
@@ -450,7 +451,8 @@ def generate_heatmaps(heatmap_series, metric, output_dir, output_filename):
 
 def generate_static_heatmaps(heatmap_series, metric, output_dir, output_filename):
     """Generate static PNG heatmaps using matplotlib/seaborn"""
-    logger = setup_logger()
+    import logging
+    logger = logging.getLogger("TradingBot")
     
     try:
         # Get parameter names from the MultiIndex

@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import json
+import logging
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -49,7 +50,7 @@ def run_walk_forward_optimization(strategy_name: str, symbol: str, start_date: s
     """
     
     config = load_config()
-    logger = setup_logger()
+    logger = logging.getLogger("TradingBot")
 
     # Use specified data source or config default
     if data_source:
@@ -346,7 +347,7 @@ def run_backtest_with_strategy_class(data, strategy_class, config):
         result = bt.run()
         return result
     except Exception as e:
-        setup_logger().error(f"Backtest failed: {e}")
+        logging.getLogger("TradingBot").error(f"Backtest failed: {e}")
         return None
 
 def calculate_walk_forward_efficiency(results, metric):
@@ -431,7 +432,7 @@ def save_walk_forward_results(results, efficiency_stats, strategy_name, symbol,
     with open(json_file, 'w') as f:
         json.dump(results_dict, f, indent=2, default=str)
     
-    setup_logger().info(f"Walk-forward results saved to: {json_file}")
+    logging.getLogger("TradingBot").info(f"Walk-forward results saved to: {json_file}")
     return results_dict, output_dir
 
 def generate_walk_forward_plots(results, efficiency_stats, metric, output_dir):
@@ -506,11 +507,11 @@ def generate_walk_forward_plots(results, efficiency_stats, metric, output_dir):
     plt.savefig(plot2_file, dpi=300, bbox_inches='tight')
     plt.close()
     
-    setup_logger().info(f"Walk-forward plots saved to: {plot1_file} and {plot2_file}")
+    logging.getLogger("TradingBot").info(f"Walk-forward plots saved to: {plot1_file} and {plot2_file}")
 
 def print_walk_forward_summary(efficiency_stats, metric):
     """Print walk-forward analysis summary"""
-    logger = setup_logger()
+    logger = logging.getLogger("TradingBot")
     
     logger.info("\n" + "="*60)
     logger.info("WALK-FORWARD ANALYSIS SUMMARY")

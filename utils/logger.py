@@ -16,6 +16,10 @@ def setup_logger(log_level: str = "INFO") -> logging.Logger:
     logger = logging.getLogger("TradingBot")
     logger.setLevel(getattr(logging, log_level.upper()))
 
+    # Check if handlers already exist to prevent duplicates
+    if logger.handlers:
+        return logger
+
     # Create formatter
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

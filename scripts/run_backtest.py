@@ -21,7 +21,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     """Run backtest for given strategy and symbol with flexible data sources"""
 
     config = load_config()
-    logger = setup_logger()
+    import logging
+    logger = logging.getLogger("TradingBot")
 
     # Use specified data source or config default
     if data_source:
@@ -61,17 +62,17 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
         return None
     
     # Convert to microBTC for fractional trading if dealing with BTC data
-        # BUT only if we're NOT using preprocessed data (which is already in microBTC)
-        if 'BTC' in symbol.upper():
-            logger.info("Converting prices to microBTC for fractional trading")
-            # Convert OHLC prices to microBTC (divide by 1e6)
-            price_columns = ['Open', 'High', 'Low', 'Close']
-            for col in price_columns:
-                if col in data.columns:
-                    data[col] = data[col] / 1e6
-            # Adjust volume (multiply by 1e6 to compensate)
-            if 'Volume' in data.columns:
-                data['Volume'] = data['Volume'] * 1e6
+    # BUT only if we're NOT using preprocessed data (which is already in microBTC)
+    if 'BTC' in symbol.upper():
+        logger.info("Converting prices to microBTC for fractional trading")
+        # Convert OHLC prices to microBTC (divide by 1e6)
+        price_columns = ['Open', 'High', 'Low', 'Close']
+        for col in price_columns:
+            if col in data.columns:
+                data[col] = data[col] / 1e6
+        # Adjust volume (multiply by 1e6 to compensate)
+        if 'Volume' in data.columns:
+            data['Volume'] = data['Volume'] * 1e6
 
     # Log available feature columns
     feature_columns = [col for col in data.columns if col not in ['Open', 'High', 'Low', 'Close', 'Volume']]
@@ -146,8 +147,8 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
                 print(f"Day {current_idx}: Signal={signal}, Price={current_price:.2f}{price_unit}, Position={pos_info}")
 
             if current_idx < len(self.signals):
-                # For breakout strategy (long-only), sell signals only close positions
-                is_long_only_strategy = strategy_instance.__class__.__name__ == 'BreakoutStrategy'
+                # Check if strategy is long-only (none currently)
+                is_long_only_strategy = False
                 
                 # Close any existing position first if signal changes direction
                 if self.position and (
@@ -244,11 +245,13 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
 
     # Create output filename with strategy, symbol, and timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = f"{strategy_name}_{symbol}_{timestamp}"
+    # Replace / with _ in symbol for filename
+    symbol_safe = symbol.replace('/', '_')
+    run_dir = f"{strategy_name}_{symbol_safe}_{timestamp}"
     output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "backtests" / run_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    output_filename = f"{strategy_name}_{symbol}_{timestamp}"
+    output_filename = f"{strategy_name}_{symbol_safe}_{timestamp}"
     
     # Save results to JSON file
     results_dict = {}

@@ -15,7 +15,7 @@ class AlertSystem:
 
     def __init__(self, config: Any) -> None:
         self.config = config
-        self.logger: logging.Logger = setup_logger()
+        self.logger: logging.Logger = logging.getLogger("TradingBot")
 
     def send_alert(self, message: str, level: str = "info") -> None:
         """

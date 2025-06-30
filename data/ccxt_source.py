@@ -29,11 +29,14 @@ class CCXTSource(DataSource):
             exchange_class = getattr(ccxt, exchange_name)
 
             config = {
-                'apiKey': api_key,
-                'secret': api_secret,
                 'timeout': 30000,
                 'enableRateLimit': True,  # Important for rate limiting
             }
+            
+            # Only add API credentials if they're provided and not placeholder values
+            if api_key and api_key != "your_api_key_here" and api_key != "":
+                config['apiKey'] = api_key
+                config['secret'] = api_secret
 
             if sandbox:
                 config['sandbox'] = True
@@ -127,6 +130,8 @@ class CCXTSource(DataSource):
 
         except Exception as e:
             print(f"Error downloading CCXT data for {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
             return pd.DataFrame()
 
     def get_current_price(self, symbol: str) -> float:

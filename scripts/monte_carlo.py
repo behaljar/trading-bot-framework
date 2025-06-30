@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 import json
+import logging
 from typing import List, Dict, Tuple
 import argparse
 from run_backtest import run_backtest
@@ -58,7 +59,7 @@ def run_monte_carlo_simulation(trades: pd.DataFrame, num_simulations: int = 1000
     
     Returns dictionary with simulation results including drawdown statistics
     """
-    logger = setup_logger()
+    logger = logging.getLogger("TradingBot")
     logger.info(f"Running {num_simulations} Monte Carlo simulations...")
     
     # Extract trade returns
@@ -227,7 +228,7 @@ def main():
     
     args = parser.parse_args()
     
-    logger = setup_logger()
+    logger = logging.getLogger("TradingBot")
     
     # Step 1: Run backtest or use existing results
     if args.use_existing:
