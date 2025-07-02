@@ -240,8 +240,8 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
     opt_kwargs = {}
     total_combinations = 1
     for param_name, param_range in optimization_params.items():
-        if isinstance(param_range, (list, tuple)) and len(param_range) >= 2:
-            if len(param_range) == 2:
+        if isinstance(param_range, (list, tuple)) and len(param_range) >= 1:
+            if len(param_range) == 2 and not isinstance(param_range[0], bool):
                 # Range format: (start, end) - create range with reasonable step
                 start, end = param_range
                 if isinstance(start, int) and isinstance(end, int):
@@ -253,7 +253,7 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
                     values = [round(x, 2) for x in np.arange(start, end + step/2, step)]
                     opt_kwargs[param_name] = values
             else:
-                # List of specific values
+                # List of specific values (including booleans)
                 values = list(param_range)
                 opt_kwargs[param_name] = values
             
@@ -289,11 +289,12 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
         
         # Create output filename with strategy, symbol, and timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_dir = f"optimize_{strategy_name}_{symbol}_{timestamp}"
+        safe_symbol = symbol.replace('/', '_')  # Replace slash to avoid path issues
+        run_dir = f"optimize_{strategy_name}_{safe_symbol}_{timestamp}"
         output_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "output" / "optimizations" / run_dir
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        output_filename = f"optimize_{strategy_name}_{symbol}_{timestamp}"
+        output_filename = f"optimize_{strategy_name}_{safe_symbol}_{timestamp}"
         
         # Save optimization results
         best_params = optimization_result._strategy.__dict__
@@ -615,11 +616,14 @@ if __name__ == "__main__":
                 optimization_params['take_profit_pct'] = [float(v) for v in values]
     
     elif args.strategy.lower() in ["breakout", "breakout_strategy"]:
-        optimization_params['entry_lookback'] = (20, 30)
-        optimization_params['exit_lookback'] = (10, 15)
-        optimization_params['atr_multiplier'] = (3, 4, 5)
-        optimization_params['volume_roc_threshold'] = (0.5, 0.75, 1.0)
-        optimization_params['trend_strength_threshold'] = (0.05, 0.1, 0.15)
+        # Test core breakout parameters (reduced for faster optimization)
+        optimization_params['entry_lookback'] = (15, 20, 25, 30)
+        optimization_params['exit_lookback'] = (15, 20, 25)
+
+        # Test ATR multiplier for stop loss
+        optimization_params['atr_multiplier'] = (2.5, 3.0, 3.5, 4.0)
+        optimization_params['use_trend_filter'] = (True, False)
+        optimization_params['slow_trend_treshold'] = (0.04, 0.05, 0.06)
     
     # Add more strategy parameter definitions here as needed
     

@@ -11,28 +11,40 @@ import numpy as np
 from typing import Dict, Any
 from .base_strategy import BaseStrategy, Signal
 
-THRESHOLD = "trend_strength_threshold"
-
 
 class BreakoutStrategy(BaseStrategy):
     """High/Low Breakout Strategy with ATR-based stop loss"""
 
     def __init__(self, params: Dict[str, Any] = None):
         default_params = {
-            "entry_lookback": 20,  # Look back period for entry (high/low breakout)
-            "exit_lookback": 10,   # Look back period for exit (high/low breakout)
+            "entry_lookback": 30,  # Look back period for entry (high/low breakout)
+            "exit_lookback": 20,   # Look back period for exit (high/low breakout)
             "atr_period": 14,      # ATR calculation period
-            "atr_multiplier": 4.0, # Stop loss = entry +/- (ATR * multiplier)
-            "volume_roc_period": 5,  # Period for volume rate of change calculation
-            "volume_roc_threshold": 0.5,  # Minimum volume ROC for entry (50% increase)
-            "trend_period": 60,  # Period for medium-term trend calculation
-            ("%s" % THRESHOLD): 0.10,  # Minimum trend strength (10% move required)
+            "atr_multiplier": 3.0, # Stop loss = entry +/- (ATR * multiplier)
+            # Multi-timeframe trend filters
+            "longterm_trend_period": 200,  # Long-term trend period (major trend)
+            "medium_trend_period": 50,     # Medium-term trend period
+            "longterm_trend_threshold": 0.0,  # 0% - just need positive/negative for direction
+            "medium_trend_threshold": 0.02,   # 2% move required for medium trend
+            "use_trend_filter": True,  # Enable/disable multi-timeframe trend filter
+            # Volume filter
+            "volume_ma_period": 60,    # Period for volume moving average
+            "relative_volume_threshold": 1.5,  # Volume must be 1.5x average
+            "use_volume_filter": True,
+            # Momentum exit (big candles with high volume indicating trend exhaustion)
+            "use_momentum_exit": True,  # Enable/disable momentum exit
+            "momentum_candle_threshold": 0.025,  # Minimum candle size % for momentum signal (2.5%)
+            "momentum_volume_threshold": 2.0,  # Volume must be 2x average for momentum exit
+            "momentum_volume_period": 20,  # Period for volume moving average
+            # Trade cooldown period
+            "cooldown_periods": 4,  # Number of candles to wait after closing a position
         }
         if params:
             default_params.update(params)
         super().__init__(default_params)
         self.position_type = None  # 'long', 'short', or None
         self.entry_price = None
+        self.last_exit_bar = None  # Track when we last exited a position
 
     def get_strategy_name(self) -> str:
         return f"Breakout_{self.params['entry_lookback']}_{self.params['exit_lookback']}"
@@ -75,21 +87,47 @@ class BreakoutStrategy(BaseStrategy):
             window=self.params['exit_lookback']
         ).min()
 
-        # Calculate Volume Rate of Change (ROC)
-        # ROC = (Current Volume / Volume N periods ago) - 1
-        volume_shift = data['Volume'].shift(self.params['volume_roc_period'])
-        data['volume_roc'] = (data['Volume'] / volume_shift) - 1
         
-        # Replace infinite values with NaN (in case of zero volume in past)
-        data['volume_roc'] = data['volume_roc'].replace([np.inf, -np.inf], np.nan)
+        # Calculate multi-timeframe trend filters
+        # Long-term trend (major trend direction)
+        longterm_price_shift = data['Close'].shift(self.params['longterm_trend_period'])
+        data['longterm_trend_roc'] = (data['Close'] - longterm_price_shift) / longterm_price_shift
         
-        # Calculate medium-term trend (price change vs N periods ago)
-        # Positive = uptrend, Negative = downtrend
-        price_shift = data['Close'].shift(self.params['trend_period'])
-        data['trend_roc'] = (data['Close'] - price_shift) / price_shift
+        # Medium trend (intermediate trend)
+        medium_price_shift = data['Close'].shift(self.params['medium_trend_period'])
+        data['medium_trend_roc'] = (data['Close'] - medium_price_shift) / medium_price_shift
+        
+        # Calculate relative volume (volume vs moving average)
+        data['volume_ma'] = data['Volume'].rolling(window=self.params['volume_ma_period']).mean()
+        data['relative_volume'] = data['Volume'] / data['volume_ma']
         
         # Calculate ATR
         data['ATR'] = self.calculate_atr(data)
+        
+        
+        # Calculate momentum exit indicators (big candles with high volume)
+        if self.params['use_momentum_exit']:
+            # Calculate candle size as percentage move
+            data['candle_size_pct'] = abs(data['Close'] - data['Open']) / data['Open']
+            
+            # Calculate volume moving average for comparison
+            data['volume_ma_momentum'] = data['Volume'].rolling(window=self.params['momentum_volume_period']).mean()
+            data['volume_ratio_momentum'] = data['Volume'] / data['volume_ma_momentum']
+            
+            # Momentum exhaustion signals:
+            # For longs: big UP candle with high volume (selling climax after uptrend)
+            data['long_momentum_exit'] = (
+                (data['Close'] > data['Open']) &  # Bullish candle
+                (data['candle_size_pct'] >= self.params['momentum_candle_threshold']) &  # Big candle
+                (data['volume_ratio_momentum'] >= self.params['momentum_volume_threshold'])  # High volume
+            )
+            
+            # For shorts: big DOWN candle with high volume (buying climax after downtrend)
+            data['short_momentum_exit'] = (
+                (data['Close'] < data['Open']) &  # Bearish candle
+                (data['candle_size_pct'] >= self.params['momentum_candle_threshold']) &  # Big candle
+                (data['volume_ratio_momentum'] >= self.params['momentum_volume_threshold'])  # High volume
+            )
         
         return data
 
@@ -107,8 +145,14 @@ class BreakoutStrategy(BaseStrategy):
         prev_high_exit = data_with_indicators[f'High_{self.params["exit_lookback"]}'].shift(1)
         prev_low_exit = data_with_indicators[f'Low_{self.params["exit_lookback"]}'].shift(1)
         atr = data_with_indicators['ATR']
-        volume_roc = data_with_indicators['volume_roc']
-        trend_roc = data_with_indicators['trend_roc']
+        
+        longterm_trend_roc = data_with_indicators['longterm_trend_roc']
+        medium_trend_roc = data_with_indicators['medium_trend_roc']
+        relative_volume = data_with_indicators['relative_volume']
+        
+        # Get momentum exit indicators if enabled
+        long_momentum_exit = data_with_indicators.get('long_momentum_exit', None) if self.params['use_momentum_exit'] else None
+        short_momentum_exit = data_with_indicators.get('short_momentum_exit', None) if self.params['use_momentum_exit'] else None
         
         # Initialize result DataFrame
         result = pd.DataFrame(index=data.index)
@@ -120,22 +164,60 @@ class BreakoutStrategy(BaseStrategy):
         position_type = None  # 'long', 'short', or None
         entry_price = None
         stop_loss_price = None
+        last_exit_bar = None  # Track when we last exited
         
         for i in range(len(data)):
-            if i < max(self.params['entry_lookback'], self.params['exit_lookback'], self.params['atr_period']):
+            # Skip initial bars until we have enough data for all indicators
+            min_bars_needed = max(
+                self.params['entry_lookback'], 
+                self.params['exit_lookback'], 
+                self.params['atr_period'],
+                self.params['longterm_trend_period'] if self.params['use_trend_filter'] else 0
+            )
+            if i < min_bars_needed:
                 continue
                 
             current_close = close_prices.iloc[i]
             current_high = high_prices.iloc[i]
             current_low = low_prices.iloc[i]
-            current_volume_roc = volume_roc.iloc[i]
-            current_trend_roc = trend_roc.iloc[i]
+            current_longterm_trend = longterm_trend_roc.iloc[i]
+            current_medium_trend = medium_trend_roc.iloc[i]
+            current_relative_volume = relative_volume.iloc[i]
+            current_long_momentum_exit = long_momentum_exit.iloc[i] if long_momentum_exit is not None else False
+            current_short_momentum_exit = short_momentum_exit.iloc[i] if short_momentum_exit is not None else False
             
             if position_type is None:
-                # Long entry: price breaks above previous 20-period high with volume surge and strong uptrend
-                if (not pd.isna(prev_high_entry.iloc[i]) and current_high > prev_high_entry.iloc[i] and
-                    not pd.isna(current_volume_roc) and current_volume_roc >= self.params['volume_roc_threshold'] and
-                    not pd.isna(current_trend_roc) and current_trend_roc >= self.params['trend_strength_threshold']):
+                # Check cooldown period - wait after closing previous position
+                cooldown_satisfied = True
+                if last_exit_bar is not None:
+                    bars_since_exit = i - last_exit_bar
+                    cooldown_satisfied = bars_since_exit >= self.params['cooldown_periods']
+                
+                # Only consider new entries if cooldown period has passed
+                if not cooldown_satisfied:
+                    continue
+                
+                # Long entry: breakout + multi-timeframe trend alignment
+                breakout_condition = not pd.isna(prev_high_entry.iloc[i]) and current_high > prev_high_entry.iloc[i]
+                
+                # Trend alignment conditions for longs
+                longterm_trend_condition = True
+                medium_trend_condition = True
+                if self.params['use_trend_filter']:
+                    # Long-term trend must be positive (uptrend)
+                    longterm_trend_condition = (not pd.isna(current_longterm_trend) and 
+                                              current_longterm_trend > self.params['longterm_trend_threshold'])
+                    # Medium-term trend must be positive and strong enough
+                    medium_trend_condition = (not pd.isna(current_medium_trend) and 
+                                            current_medium_trend >= self.params['medium_trend_threshold'])
+                
+                # Relative volume condition (optional)
+                volume_condition = True
+                if self.params['use_volume_filter']:
+                    volume_condition = (not pd.isna(current_relative_volume) and 
+                                      current_relative_volume >= self.params['relative_volume_threshold'])
+                
+                if breakout_condition and longterm_trend_condition and medium_trend_condition and volume_condition:
                     result.loc[result.index[i], 'signal'] = Signal.BUY.value
                     entry_price = current_close
                     position_type = 'long'
@@ -145,18 +227,36 @@ class BreakoutStrategy(BaseStrategy):
                         stop_loss_price = entry_price - (atr.iloc[i] * self.params['atr_multiplier'])
                         result.loc[result.index[i], 'stop_loss'] = stop_loss_price
                 
-                # Short entry: price breaks below previous 20-period low with volume surge and strong downtrend  
-                elif (not pd.isna(prev_low_entry.iloc[i]) and current_low < prev_low_entry.iloc[i] and
-                      not pd.isna(current_volume_roc) and current_volume_roc >= self.params['volume_roc_threshold'] and
-                      not pd.isna(current_trend_roc) and current_trend_roc <= -self.params['trend_strength_threshold']):
-                    result.loc[result.index[i], 'signal'] = Signal.SELL.value
-                    entry_price = current_close
-                    position_type = 'short'
+                # Short entry: breakout + multi-timeframe trend alignment
+                elif True:  # Use elif to maintain structure
+                    breakout_condition = not pd.isna(prev_low_entry.iloc[i]) and current_low < prev_low_entry.iloc[i]
                     
-                    # Set stop loss at 2 x ATR above entry
-                    if not pd.isna(atr.iloc[i]):
-                        stop_loss_price = entry_price + (atr.iloc[i] * self.params['atr_multiplier'])
-                        result.loc[result.index[i], 'stop_loss'] = stop_loss_price
+                    # Trend alignment conditions for shorts
+                    longterm_trend_condition = True
+                    medium_trend_condition = True
+                    if self.params['use_trend_filter']:
+                        # Long-term trend must be negative (downtrend)
+                        longterm_trend_condition = (not pd.isna(current_longterm_trend) and 
+                                                  current_longterm_trend < -self.params['longterm_trend_threshold'])
+                        # Medium-term trend must be negative and strong enough
+                        medium_trend_condition = (not pd.isna(current_medium_trend) and 
+                                                current_medium_trend <= -self.params['medium_trend_threshold'])
+                    
+                    # Relative volume condition (same for shorts)
+                    volume_condition = True
+                    if self.params['use_volume_filter']:
+                        volume_condition = (not pd.isna(current_relative_volume) and 
+                                          current_relative_volume >= self.params['relative_volume_threshold'])
+                    
+                    if breakout_condition and longterm_trend_condition and medium_trend_condition and volume_condition:
+                        result.loc[result.index[i], 'signal'] = Signal.SELL.value
+                        entry_price = current_close
+                        position_type = 'short'
+                        
+                        # Set stop loss at 2 x ATR above entry
+                        if not pd.isna(atr.iloc[i]):
+                            stop_loss_price = entry_price + (atr.iloc[i] * self.params['atr_multiplier'])
+                            result.loc[result.index[i], 'stop_loss'] = stop_loss_price
                     
             elif position_type == 'long':
                 # Update stop loss for long position
@@ -170,6 +270,7 @@ class BreakoutStrategy(BaseStrategy):
                     position_type = None
                     entry_price = None
                     stop_loss_price = None
+                    last_exit_bar = i
                     
                 # Exit condition 2: stop loss hit
                 elif stop_loss_price is not None and current_low <= stop_loss_price:
@@ -177,6 +278,15 @@ class BreakoutStrategy(BaseStrategy):
                     position_type = None
                     entry_price = None
                     stop_loss_price = None
+                    last_exit_bar = i
+                
+                # Exit condition 3: momentum exhaustion (big up candle with high volume)
+                elif self.params['use_momentum_exit'] and current_long_momentum_exit:
+                    result.loc[result.index[i], 'signal'] = Signal.SELL.value
+                    position_type = None
+                    entry_price = None
+                    stop_loss_price = None
+                    last_exit_bar = i
                     
             elif position_type == 'short':
                 # Update stop loss for short position
@@ -190,6 +300,7 @@ class BreakoutStrategy(BaseStrategy):
                     position_type = None
                     entry_price = None
                     stop_loss_price = None
+                    last_exit_bar = i
                     
                 # Exit condition 2: stop loss hit
                 elif stop_loss_price is not None and current_high >= stop_loss_price:
@@ -197,5 +308,14 @@ class BreakoutStrategy(BaseStrategy):
                     position_type = None
                     entry_price = None
                     stop_loss_price = None
+                    last_exit_bar = i
+                
+                # Exit condition 3: momentum exhaustion (big down candle with high volume)
+                elif self.params['use_momentum_exit'] and current_short_momentum_exit:
+                    result.loc[result.index[i], 'signal'] = Signal.BUY.value
+                    position_type = None
+                    entry_price = None
+                    stop_loss_price = None
+                    last_exit_bar = i
         
         return result

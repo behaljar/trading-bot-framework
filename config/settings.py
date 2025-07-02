@@ -25,7 +25,7 @@ class TradingConfig:
     exchange_name: str = get_env_value("EXCHANGE_NAME", "binance")  # For CCXT
     csv_data_directory: str = get_env_value("CSV_DATA_DIRECTORY", "data/csv")  # For CSV data source
     symbols: Optional[List[str]] = None
-    timeframe: str = get_env_value("TIMEFRAME", "1d")
+    timeframe: str = get_env_value("TIMEFRAME", "4h")
     use_sandbox: bool = get_env_value("USE_SANDBOX", "true").lower() == "true"  # For CCXT testnet
 
     # Strategy settings
@@ -70,13 +70,13 @@ class TradingConfig:
                 exit_lookback = int(get_env_value("STRATEGY_EXIT_LOOKBACK", "10"))
                 atr_period = int(get_env_value("STRATEGY_ATR_PERIOD", "14"))
                 atr_multiplier = float(get_env_value("STRATEGY_ATR_MULTIPLIER", "2.0"))
-                
-                self.strategy_params = {
-                    "entry_lookback": entry_lookback,
-                    "exit_lookback": exit_lookback,
-                    "atr_period": atr_period,
-                    "atr_multiplier": atr_multiplier
-                }
+
+                # self.strategy_params = {
+                #     "entry_lookback": entry_lookback,
+                #     "exit_lookback": exit_lookback,
+                #     "atr_period": atr_period,
+                #     "atr_multiplier": atr_multiplier
+                # }
             else:
                 # SMA and other strategy parameters
                 short_window = int(get_env_value("STRATEGY_SHORT_WINDOW", "20"))
