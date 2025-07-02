@@ -18,7 +18,7 @@ from itertools import product
 from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
-from strategies.mean_reversion import RSIStrategy
+from strategies.mean_reversion import MeanReversion
 from strategies.breakout_strategy import BreakoutStrategy
 from utils.logger import setup_logger
 
@@ -205,8 +205,8 @@ def optimize_strategy(strategy_name: str, symbol: str, start_date: str, end_date
     
     if strategy_name.lower() in ["sma", "sma_crossover", "trend_following"]: 
         _strategy_class = SMAStrategy
-    elif strategy_name.lower() in ["rsi", "rsi_mean_reversion"]:
-        _strategy_class = RSIStrategy
+    elif strategy_name.lower() in ["mean_reversion"]:
+        _strategy_class = MeanReversion
     elif strategy_name.lower() in ["breakout", "breakout_strategy"]:
         _strategy_class = BreakoutStrategy
     else:
@@ -624,7 +624,18 @@ if __name__ == "__main__":
         optimization_params['atr_multiplier'] = (2.5, 3.0, 3.5, 4.0)
         optimization_params['use_trend_filter'] = (True, False)
         optimization_params['slow_trend_treshold'] = (0.04, 0.05, 0.06)
-    
+
+    elif args.strategy.lower() in ["mean_reversion"]:
+        # Test core breakout parameters (reduced for faster optimization)
+        optimization_params['lookback_period'] = (20, 25, 30, 35)
+        optimization_params['trend_period'] = (50, 100, 150)
+        optimization_params['trend_treshold'] = (0.15, 0.20, 0.25)
+
+        # Test ATR multiplier for stop loss
+        optimization_params['atr_multiplier'] = (2.5, 3.0, 3.5, 4.0)
+        optimization_params['use_rsi_filter'] = (True, False)
+        optimization_params['adx_treshold'] = (20, 25, 30)
+
     # Add more strategy parameter definitions here as needed
     
     if not optimization_params:
