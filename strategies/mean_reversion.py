@@ -161,3 +161,7 @@ class MeanReversion(BaseStrategy):
                     self.position_type = 'LONG'
 
         return result
+
+
+# Alias for clarity
+ZScoreStrategy = MeanReversion

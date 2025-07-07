@@ -44,6 +44,10 @@ class TradingConfig:
     # API keys (from environment variables)
     api_key: str = get_env_value("EXCHANGE_API_KEY", "")
     api_secret: str = get_env_value("EXCHANGE_API_SECRET", "")
+    
+    # Trading mode settings
+    allow_short: bool = get_env_value("ALLOW_SHORT", "false").lower() == "true"
+    trading_type: str = get_env_value("TRADING_TYPE", "spot")  # spot or future
 
     # Monitoring
     alert_email: str = get_env_value("ALERT_EMAIL", "")
@@ -71,12 +75,12 @@ class TradingConfig:
                 atr_period = int(get_env_value("STRATEGY_ATR_PERIOD", "14"))
                 atr_multiplier = float(get_env_value("STRATEGY_ATR_MULTIPLIER", "2.0"))
 
-                # self.strategy_params = {
-                #     "entry_lookback": entry_lookback,
-                #     "exit_lookback": exit_lookback,
-                #     "atr_period": atr_period,
-                #     "atr_multiplier": atr_multiplier
-                # }
+                self.strategy_params = {
+                    "entry_lookback": entry_lookback,
+                    "exit_lookback": exit_lookback,
+                    "atr_period": atr_period,
+                    "atr_multiplier": atr_multiplier
+                }
             else:
                 # SMA and other strategy parameters
                 short_window = int(get_env_value("STRATEGY_SHORT_WINDOW", "20"))

@@ -5,15 +5,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Core Development
-- `make dev` - Start bot in development mode (paper trading)
+- `make dev` - Start bot in development mode (sandbox trading)
 - `make test` - Run tests with coverage (`python -m pytest tests/ -v --cov=trading_bot`)
 - `make install` - Install dependencies (`pip install -r requirements.txt`)
 - `make clean` - Clean up Python cache files and test artifacts
 
 ### Trading Operations
 - `make backtest` - Run backtest with SMA strategy on AAPL
-- `make paper` - Start paper trading (single run)
-- `make live` - Start live trading (scheduled mode)
+- `make paper` - Start sandbox trading with CCXT (single run)
+- `make live` - Start live trading (real money - be careful!)
+
+### Order Testing
+- `make test-orders` - Test order execution with simple strategy
+- `make test-positions` - Test position synchronization
+- Uses testnet/sandbox mode for safe order testing
 
 ### Development Tools
 - `make dev-dashboard` - Start Streamlit dashboard on port 8501
@@ -50,8 +55,9 @@ python scripts/generate_sample_data.py
 ### Configuration System
 - Environment-based configuration via `.env` file and environment variables
 - `config/settings.py` - Main configuration class with environment variable parsing
-- Supports multiple data sources: `yahoo`, `ccxt`, `csv`
+- **Live Trading**: Only CCXT data source supported (`DATA_SOURCE=ccxt`)
 - Strategy parameters configurable via `STRATEGY_*` environment variables
+- Multiple config templates: `.env.sandbox`, `.env.live`, `.env.test`
 
 ### Data Layer Architecture
 - **Base**: `data/base_data_source.py` - Abstract interface
@@ -63,21 +69,32 @@ python scripts/generate_sample_data.py
 - **Base Class**: `strategies/base_strategy.py` - Abstract strategy interface with Signal enum
 - **Implementation**: Strategies must implement `generate_signals()` and `get_strategy_name()`
 - **Features**: Supports custom indicators from CSV, position sizing, signal history
-- **Built-in**: SMA crossover (`trend_following.py`), RSI mean reversion
+- **Built-in**: SMA crossover (`trend_following.py`), Z-Score mean reversion (`mean_reversion.py`)
 
 ### Key Components
+- **Live Execution**: `execution/ccxt/` - Live trading with CCXT exchanges
+  - `ccxt_trader.py` - Main trading engine with error handling and state management
+  - `state_persistence.py` - Abstract state storage interface (supports PostgreSQL migration)
+  - `file_state_store.py` - File-based state storage implementation
+  - `position_sync.py` - Position synchronization with exchange
+  - `data_manager.py` - Efficient historical data caching
 - **Risk Management**: `risk/risk_manager.py` - Position sizing and risk controls
-- **Execution**: `execution/paper_trader.py` - Paper trading simulation
 - **Monitoring**: `monitoring/alert_system.py` - Alert and notification system
 - **Logging**: `utils/logger.py` - Centralized logging with date-based log files
 - **Data Preprocessing**: `scripts/preprocess_data.py` - Feature engineering pipeline with 50+ technical indicators
 
 ### Data Flow
 1. Configuration loaded from environment variables
-2. Data source initialized based on `DATA_SOURCE` setting
+2. CCXTTrader initialized with exchange connection and state recovery
 3. Strategy selected based on `STRATEGY_NAME` (defaults to SMA if unknown)
-4. Main loop processes each symbol: data → signals → risk management → execution
-5. Performance summary logged at end
+4. Main loop for each symbol:
+   - Fetch/cache historical data for signal generation
+   - Generate trading signals using completed bars
+   - Get real-time price for execution
+   - Determine action based on position and signal
+   - Execute orders with comprehensive error handling
+   - Update position tracking and save state
+5. Continuous operation with automatic recovery on restart
 
 ### CSV Data Source Features
 - Supports pre-calculated indicators beyond OHLCV
@@ -104,7 +121,21 @@ python scripts/generate_sample_data.py
 - Coverage target appears to be focused on `trading_bot` module
 - Supports testing individual strategies and components
 
-## Deployment Modes
-- **Development**: Paper trading with debug logging
-- **Production**: Live trading mode (requires API credentials)
-- **Backtest**: Historical analysis via `scripts/run_backtest.py`
+## Trading Modes
+- **Sandbox**: Paper trading with real market data (`USE_SANDBOX=true`)
+- **Live**: Real money trading (`USE_SANDBOX=false`)
+- **Test**: Order execution testing with alternating buy/sell strategy
+- **Backtest**: Historical analysis via `scripts/run_backtest.py` (CSV/Yahoo data)
+
+## Configuration Templates
+- `.env.example` - Complete configuration reference
+- `.env.sandbox` - Safe testing configuration
+- `.env.live` - Live trading template (real money)
+- `.env.test` - Order testing configuration
+
+## Live Trading Features
+- **State Persistence**: Crash-resistant with automatic recovery
+- **Position Synchronization**: Handles pre-existing positions
+- **Order Management**: Comprehensive error handling and retry logic
+- **Safety Features**: Daily loss limits, emergency stops, instance locking
+- **Real-time Data**: Smart caching with new bar detection

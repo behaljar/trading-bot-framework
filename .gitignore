@@ -62,7 +62,6 @@ ipython_config.py
 
 # Environments
 .env
-.env.*
 .venv
 
 # IDEs

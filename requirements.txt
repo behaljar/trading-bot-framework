@@ -1,17 +1,29 @@
+# Core dependencies
 pandas>=2.0.0
 numpy>=1.24.0,<2.0.0
-yfinance>=0.2.18
-backtesting>=0.3.3
-bokeh>=3.0.0
-PyYAML>=6.0
-requests>=2.31.0
-ccxt>=4.2.0
 python-dotenv>=1.0.0
-schedule>=1.2.0
-streamlit>=1.28.0
-jupyterlab>=4.0.0
+
+# Trading and data
+ccxt>=4.2.0                 # Cryptocurrency exchange integration
+yfinance>=0.2.18           # Yahoo Finance data (for backtesting)
+pandas-ta>=0.3.14b         # Technical analysis indicators
+
+# Utilities
+requests>=2.31.0
+PyYAML>=6.0
+filelock>=3.12.0           # File locking for state management
+
+# Development and testing
 pytest>=7.4.0
 pytest-cov>=4.0.0
-matplotlib>=3.10.3
-seaborn>=0.13.2
-pandas-ta>=0.3.14b
+
+# Optional: Analytics and visualization (for backtesting/analysis)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+backtesting>=0.3.3
+bokeh>=3.0.0
+
+# Optional: Monitoring and development tools
+streamlit>=1.28.0          # For dashboard
+jupyterlab>=4.0.0          # For strategy development
+schedule>=1.2.0            # For scheduled runs
