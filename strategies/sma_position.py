@@ -18,6 +18,7 @@ class SMAPositionStrategy(BaseStrategy):
         if params:
             default_params.update(params)
         super().__init__(default_params)
+        self.min_bars_required = 2
 
     def get_strategy_name(self) -> str:
         return f"SMA_Position_{self.params['short_window']}_{self.params['long_window']}"

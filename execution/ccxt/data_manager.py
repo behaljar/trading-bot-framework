@@ -10,7 +10,7 @@ import logging
 class DataManager:
     """Manages historical and real-time data efficiently"""
     
-    def __init__(self, max_bars: int = 500, cache_duration: int = 60):
+    def __init__(self, max_bars: int = 1000, cache_duration: int = 60):
         """
         Initialize data manager
         

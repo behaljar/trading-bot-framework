@@ -45,6 +45,7 @@ class BreakoutStrategy(BaseStrategy):
         self.position_type = None  # 'long', 'short', or None
         self.entry_price = None
         self.last_exit_bar = None  # Track when we last exited a position
+        self.min_bars_required = 2
 
     def get_strategy_name(self) -> str:
         return f"Breakout_{self.params['entry_lookback']}_{self.params['exit_lookback']}"

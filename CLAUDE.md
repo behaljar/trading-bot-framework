@@ -139,3 +139,8 @@ python scripts/generate_sample_data.py
 - **Order Management**: Comprehensive error handling and retry logic
 - **Safety Features**: Daily loss limits, emergency stops, instance locking
 - **Real-time Data**: Smart caching with new bar detection
+
+## Commit Message Guidelines
+- NEVER include "Claude", "Claude Code", or AI-related references in commit messages
+- Keep commit messages professional and focused on the actual changes made
+- Use conventional commit format (feat:, fix:, docs:, etc.)

@@ -59,7 +59,7 @@ ipython_config.py
 
 # pyenv
 .python-version
-
+state/*
 # Environments
 .env
 .venv

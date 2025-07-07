@@ -26,6 +26,7 @@ class MeanReversion(BaseStrategy):
             default_params.update(params)
         super().__init__(default_params)
         self.position_type = None  # Track if we're in a LONG or SHORT position
+        self.min_bars_required = 2
 
     def get_strategy_name(self) -> str:
         return f"ZScore_MeanRev_{self.params['lookback_period']}_{self.params['atr_multiplier']}"

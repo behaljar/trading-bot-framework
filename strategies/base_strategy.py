@@ -18,6 +18,7 @@ class BaseStrategy(ABC):
         self.params = params or {}
         self.positions = {}  # Current positions for each symbol
         self.signals_history = []  # Signal history
+        self.min_bars_required = 2
 
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:

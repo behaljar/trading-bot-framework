@@ -97,7 +97,8 @@ class TestPivotDetector:
             ticker = "AAPL"
             end_date = datetime.now()
             start_date = end_date - timedelta(days=90)
-            
+
+
             data = yf.download(ticker, start=start_date, end=end_date)
             
             if not data.empty:
@@ -172,9 +173,11 @@ class TestPivotDetector:
         
         plt.tight_layout()
         
-        # Save the plot
-        test_dir = os.path.dirname(os.path.abspath(__file__))
-        plot_path = os.path.join(test_dir, 'pivot_detection_test.png')
+        # Save the plot to output/tests directory
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(project_root, 'output', 'tests')
+        os.makedirs(output_dir, exist_ok=True)
+        plot_path = os.path.join(output_dir, 'pivot_detection_test.png')
         plt.savefig(plot_path, dpi=150, bbox_inches='tight')
         plt.close()
         
@@ -185,27 +188,42 @@ class TestPivotDetector:
         assert os.path.exists(plot_path)
         
     def test_real_data_visualization(self):
-        """Test visualization with real market data"""
+        """Test visualization with real market data from CCXT"""
         try:
-            # Fetch real data
-            ticker = "AAPL"
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=30)
+            # Import CCXT source
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from data.ccxt_source import CCXTSource
             
-            data = yf.download(ticker, start=start_date, end=end_date, interval="15m")
+            # Fetch real BTC/USDT data from Binance
+            source = CCXTSource(
+                exchange_name="binance",
+                api_key=None,  # Public data doesn't need API keys
+                api_secret=None,
+                sandbox=False
+            )
+            
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)  # 7 days of 15m data
+            
+            data = source.get_historical_data(
+                symbol="BTC/USDT:USDT",
+                start_date=start_date.strftime('%Y-%m-%d'),
+                end_date=end_date.strftime('%Y-%m-%d'),
+                timeframe="15m"
+            )
             
             if len(data) == 0:
                 pytest.skip("Unable to fetch real market data")
                 
-            # Reset index to make Date a column
+            # Reset index to make timestamp a column for CCXT data
             data = data.reset_index()
             
-            # Handle multi-level columns from yfinance
-            if hasattr(data.columns, 'levels'):
-                data.columns = data.columns.droplevel(1)  # Remove ticker level
+            # CCXT data comes with clean column names, no need to handle multi-level columns
             
             # Find pivot points
-            left_bars, right_bars = 50, 50
+            left_bars, right_bars = 25, 25
             pivot_highs = self.detector.find_all_pivot_highs(data['High'].values, left_bars, right_bars)
             pivot_lows = self.detector.find_all_pivot_lows(data['Low'].values, left_bars, right_bars)
             
@@ -252,29 +270,32 @@ class TestPivotDetector:
                     pivot_low_plotted = True
             
             # Formatting
+            symbol = "BTC/USDT"
             ax.set_xlabel('Date')
             ax.set_ylabel('Price ($)')
-            ax.set_title(f'{ticker} - Candlestick Chart with Pivot Points (L:{left_bars}, R:{right_bars})')
+            ax.set_title(f'{symbol} - Candlestick Chart with Pivot Points (L:{left_bars}, R:{right_bars})')
             ax.grid(True, alpha=0.3)
             if pivot_high_plotted or pivot_low_plotted:
                 ax.legend()
             
-            # Set x-axis labels
+            # Set x-axis labels using timestamp column
             step = max(1, len(data) // 10)
             ax.set_xticks(range(0, len(data), step))
-            ax.set_xticklabels([data.iloc[i]['Datetime'].strftime('%m/%d %H:%M') 
+            ax.set_xticklabels([data.iloc[i]['timestamp'].strftime('%m/%d %H:%M') 
                                for i in range(0, len(data), step)], rotation=45)
             
             plt.tight_layout()
             
-            # Save the plot
-            test_dir = os.path.dirname(os.path.abspath(__file__))
-            plot_path = os.path.join(test_dir, f'pivot_detection_{ticker}_real.png')
+            # Save the plot to output/tests directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            output_dir = os.path.join(project_root, 'output', 'tests')
+            os.makedirs(output_dir, exist_ok=True)
+            plot_path = os.path.join(output_dir, f'pivot_detection_btc_usdt_real.png')
             plt.savefig(plot_path, dpi=150, bbox_inches='tight')
             plt.close()
             
             print(f"Real data candlestick chart saved to: {plot_path}")
-            print(f"Found {len(pivot_highs)} pivot highs and {len(pivot_lows)} pivot lows in {ticker}")
+            print(f"Found {len(pivot_highs)} pivot highs and {len(pivot_lows)} pivot lows in {symbol}")
             
             # Verify we created the visualization
             assert os.path.exists(plot_path)

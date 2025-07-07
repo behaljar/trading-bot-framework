@@ -13,7 +13,7 @@ from pathlib import Path
 from config.settings import load_config
 from data import YahooFinanceSource, CCXTSource, CSVDataSource
 from strategies.trend_following import SMAStrategy
-from strategies.mean_reversion import RSIStrategy
+from strategies.mean_reversion import MeanReversion
 from strategies.breakout_strategy import BreakoutStrategy
 from utils.logger import setup_logger
 
@@ -82,7 +82,7 @@ def run_backtest(strategy_name: str, symbol: str, start_date: str, end_date: str
     if strategy_name.lower() in ["sma", "sma_crossover", "trend_following"]:
         strategy_class = SMAStrategy
     elif strategy_name.lower() in ["rsi", "rsi_mean_reversion"]:
-        strategy_class = RSIStrategy
+        strategy_class = MeanReversion
     elif strategy_name.lower() in ["breakout", "breakout_strategy"]:
         strategy_class = BreakoutStrategy
     else:
