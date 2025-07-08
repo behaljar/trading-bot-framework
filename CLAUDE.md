@@ -64,6 +64,7 @@ python scripts/generate_sample_data.py
 - **Yahoo Finance**: `data/yahoo_finance.py` - Stock market data
 - **CCXT**: `data/ccxt_source.py` - Cryptocurrency exchange data with sandbox support
 - **CSV**: `data/csv_source.py` - Custom data with pre-calculated indicators support
+- **IBKR**: `data/ibkr_source.py` - Interactive Brokers data with ib_async integration
 
 ### Strategy Framework
 - **Base Class**: `strategies/base_strategy.py` - Abstract strategy interface with Signal enum
@@ -132,6 +133,46 @@ python scripts/generate_sample_data.py
 - `.env.sandbox` - Safe testing configuration
 - `.env.live` - Live trading template (real money)
 - `.env.test` - Order testing configuration
+- `.env.ibkr.paper` - IBKR paper trading configuration
+- `.env.ibkr.live` - IBKR live trading configuration
+
+## IBKR Integration
+- **Connection Management**: Professional-grade connection with auto-reconnect via ib_async
+- **Data Sources**: Real-time and historical market data from Interactive Brokers
+- **Paper/Live Trading**: Seamless switching between paper and live accounts
+- **Market Data Types**: Live, delayed, and frozen market data support
+- **Account Management**: Multi-account support with proper authentication
+- **Error Handling**: Comprehensive IBKR error code mapping and recovery
+- **Rate Limiting**: Built-in API rate limiting to respect IBKR limits
+
+### IBKR Commands
+```bash
+# Test IBKR connection and functionality
+make ibkr-test
+
+# Start IBKR paper trading (port 7497)
+make ibkr-paper
+
+# Start IBKR live trading (port 7496) - REAL MONEY
+make ibkr-live
+
+# Paper trading with IBKR data
+make paper-ibkr
+```
+
+### IBKR Configuration
+- **Paper Trading**: Port 7497 (TWS) or 4002 (Gateway)
+- **Live Trading**: Port 7496 (TWS) or 4001 (Gateway)
+- **Market Data**: Requires API acknowledgement for off-platform data
+- **Authentication**: Manual TWS/Gateway login required (no headless mode)
+- **Client IDs**: Unique per connection (0-32)
+
+### IBKR Prerequisites
+1. **TWS or IB Gateway**: Must be running and logged in
+2. **API Configuration**: Enable API connections in TWS settings
+3. **Market Data**: Complete API acknowledgement form
+4. **Account Access**: Proper account permissions for trading
+5. **Memory**: Increase TWS memory allocation to 4GB+ for stability
 
 ## Live Trading Features
 - **State Persistence**: Crash-resistant with automatic recovery
@@ -144,3 +185,4 @@ python scripts/generate_sample_data.py
 - NEVER include "Claude", "Claude Code", or AI-related references in commit messages
 - Keep commit messages professional and focused on the actual changes made
 - Use conventional commit format (feat:, fix:, docs:, etc.)
+- NEVER use the auto-generated commit format with "🤖 Generated with [Claude Code]" footer

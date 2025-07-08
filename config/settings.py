@@ -21,7 +21,7 @@ def get_env_value(key: str, default: str = "") -> str:
 @dataclass
 class TradingConfig:
     # Data settings
-    data_source: str = get_env_value("DATA_SOURCE", "ccxt")  # yahoo, ccxt, csv
+    data_source: str = get_env_value("DATA_SOURCE", "ccxt")  # yahoo, ccxt, csv, ibkr
     exchange_name: str = get_env_value("EXCHANGE_NAME", "binance")  # For CCXT
     csv_data_directory: str = get_env_value("CSV_DATA_DIRECTORY", "data/csv")  # For CSV data source
     symbols: Optional[List[str]] = None

@@ -7,6 +7,7 @@ python-dotenv>=1.0.0
 ccxt>=4.2.0                 # Cryptocurrency exchange integration
 yfinance>=0.2.18           # Yahoo Finance data (for backtesting)
 pandas-ta>=0.3.14b         # Technical analysis indicators
+ib_async>=0.9.86           # Interactive Brokers API (successor to ib_insync)
 
 # Utilities
 requests>=2.31.0

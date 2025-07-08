@@ -14,6 +14,7 @@ from utils.logger import setup_logger
 from data.yahoo_finance import YahooFinanceSource
 from data.ccxt_source import CCXTSource
 from data.csv_source import CSVDataSource
+from data.ibkr_sync_wrapper import IBKRSyncWrapper
 from strategies.trend_following import SMAStrategy
 from strategies.breakout_strategy import BreakoutStrategy
 from strategies.mean_reversion import MeanReversion
@@ -23,7 +24,7 @@ from execution.paper import PaperTrader, PerformanceTracker
 
 def main():
     parser = argparse.ArgumentParser(description='Run paper trading simulation')
-    parser.add_argument('--source', choices=['yahoo', 'ccxt', 'csv'], 
+    parser.add_argument('--source', choices=['yahoo', 'ccxt', 'csv', 'ibkr'], 
                        default='yahoo', help='Data source to use')
     parser.add_argument('--strategy', default='sma', 
                        help='Strategy name (sma, zscore, etc.)')
@@ -70,6 +71,8 @@ def main():
             # Use default symbols based on data source
             if args.source == 'ccxt':
                 symbols = ['BTC/USDT', 'ETH/USDT']
+            elif args.source == 'ibkr':
+                symbols = ['SPY', 'AAPL', 'MSFT']
             else:
                 symbols = ['AAPL', 'MSFT', 'GOOGL']
                 
@@ -91,6 +94,10 @@ def main():
             )
         elif args.source == 'csv':
             data_source = CSVDataSource(config.csv_data_directory)
+        elif args.source == 'ibkr':
+            from config.ibkr_config import create_ibkr_config
+            ibkr_config = create_ibkr_config()
+            data_source = IBKRSyncWrapper(ibkr_config)
         else:
             raise ValueError(f"Unknown data source: {args.source}")
         

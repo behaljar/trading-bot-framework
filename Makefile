@@ -21,6 +21,16 @@ help:
 	@echo "  make sandbox     - Paper trading (safe)"
 	@echo "  make live        - Live trading (real money!)"
 	@echo ""
+	@echo "📄 PAPER TRADING:"
+	@echo "  make paper-yahoo - Paper trade with Yahoo Finance"
+	@echo "  make paper-ccxt  - Paper trade with CCXT exchanges"
+	@echo "  make paper-ibkr  - Paper trade with IBKR"
+	@echo ""
+	@echo "🏦 IBKR INTEGRATION:"
+	@echo "  make ibkr-test   - Test IBKR connection"
+	@echo "  make ibkr-paper  - IBKR paper trading"
+	@echo "  make ibkr-live   - IBKR live trading (REAL MONEY!)"
+	@echo ""
 	@echo "📊 UTILITIES:"
 	@echo "  make logs        - Show recent logs"
 	@echo "  make status      - Show current state"
@@ -68,6 +78,32 @@ paper-yahoo:
 paper-ccxt:
 	@echo "📄 Starting paper trading with CCXT data..."
 	python scripts/run_paper_trading.py --source ccxt --symbols BTC/USDT ETH/USDT
+
+paper-ibkr:
+	@echo "📄 Starting paper trading with IBKR data..."
+	@echo "⚠️  Make sure your .env is configured for IBKR paper trading"
+	python scripts/run_paper_trading.py --source ibkr --symbols SPY AAPL MSFT
+
+# === IBKR COMMANDS ===
+ibkr-test:
+	@echo "🧪 Testing IBKR connection and functionality..."
+	@echo "⚠️  Make sure TWS or IB Gateway is running on paper trading mode"
+	@echo "⚠️  Make sure your .env is configured for IBKR paper trading"
+	python tests/test_ibkr_connection.py
+
+ibkr-paper:
+	@echo "📄 Starting IBKR paper trading mode..."
+	@echo "⚠️  Make sure TWS/IB Gateway is running on port 7497 (paper)"
+	@echo "⚠️  Make sure your .env is configured for IBKR paper trading"
+	python trading_bot/main.py
+
+ibkr-live:
+	@echo "🚨 Starting IBKR LIVE trading mode..."
+	@echo "⚠️  WARNING: This will place REAL trades with REAL money!"
+	@echo "⚠️  Make sure TWS/IB Gateway is running on port 7496 (live)"
+	@echo "⚠️  Make sure your .env is configured for IBKR live trading"
+	@read -p "Are you sure you want to trade with REAL money? (yes/no): " confirm && [ "$$confirm" = "yes" ]
+	python trading_bot/main.py
 
 sandbox:
 	@echo "📄 Starting SANDBOX trading (safe with testnet)..."
