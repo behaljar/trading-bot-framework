@@ -1,6 +1,6 @@
-# 🤖 Cryptocurrency Trading Bot
+# 🤖 Professional Trading Bot Framework
 
-A production-ready automated trading bot for cryptocurrency exchanges with comprehensive risk management, state persistence, and error handling.
+An automated trading bot framework supporting multiple asset classes including cryptocurrencies, stocks, ETFs, and more. Features comprehensive paper trading, risk management, and data source integration. Under active development with production deployment planned for the future.
 
 ## ⚡ Quick Start
 
@@ -33,6 +33,11 @@ make test-orders
 # Local paper trading with virtual portfolio
 make paper
 
+# Paper trading with different data sources
+make paper-yahoo    # Stock market data (Yahoo Finance)
+make paper-ccxt     # Cryptocurrency data
+make paper-ibkr     # IBKR stock data (requires TWS/Gateway)
+
 # Or start sandbox trading with exchange testnet
 make sandbox
 ```
@@ -53,20 +58,22 @@ make live
 
 ### 🔒 Safety First
 - **Paper Trading**: Local simulation with virtual portfolio and realistic execution
+- **Multiple Data Sources**: Yahoo Finance (stocks), CCXT (crypto), IBKR (professional)
 - **Sandbox Mode**: Test with real market data on exchange testnets
 - **State Persistence**: Crash-resistant with automatic recovery
-- **Position Sync**: Handles pre-existing positions on restart
-- **Daily Loss Limits**: Automatic emergency stops
-- **Instance Locking**: Prevents multiple bots running simultaneously
+- **Risk Management**: Position sizing, stop losses, exposure limits
+- **Comprehensive Testing**: Extensive test suite for all components
 
 ### 📊 Trading Capabilities
+- **Multi-Asset Support**: Cryptocurrencies, stocks, ETFs, and more
 - **Multiple Strategies**: SMA, RSI, Breakout, and custom strategies
-- **Real-time Execution**: Live order placement with comprehensive error handling
-- **Smart Data Management**: Efficient historical data caching
-- **Risk Management**: Position sizing, stop losses, exposure limits
+- **Professional Data Sources**: IBKR, CCXT, Yahoo Finance integration
+- **Smart Data Management**: Efficient historical data caching and preprocessing
+- **Flexible Execution**: Paper trading, sandbox, and live trading modes
 
 ### 🛠️ Technical Features
-- **CCXT Integration**: Supports 100+ cryptocurrency exchanges
+- **Multiple Data Sources**: CCXT (100+ crypto exchanges), IBKR (stocks), Yahoo Finance
+- **Professional IBKR Integration**: Native API with TWS/Gateway support
 - **Error Recovery**: Automatic retry logic for API failures
 - **Comprehensive Logging**: Detailed execution logs with rotation
 - **Flexible Configuration**: Environment-based settings
@@ -125,8 +132,9 @@ The built-in paper trader provides realistic simulation without using real money
 make paper
 
 # Paper trading with different data sources
-make paper-yahoo    # Stock market data
-make paper-ccxt     # Cryptocurrency data
+make paper-yahoo    # Stock market data (Yahoo Finance)
+make paper-ccxt     # Cryptocurrency data (exchanges)
+make paper-ibkr     # IBKR stock data (professional grade)
 
 # Custom paper trading
 python scripts/run_paper_trading.py \
@@ -136,6 +144,13 @@ python scripts/run_paper_trading.py \
   --commission 0.001 \
   --spread 10 \
   --slippage 5
+
+# IBKR paper trading (requires TWS/Gateway running)
+python scripts/run_paper_trading.py \
+  --source ibkr \
+  --symbols SPY AAPL MSFT \
+  --timeframe 1h \
+  --strategy sma
 ```
 
 ### Paper Trading Features
@@ -168,10 +183,18 @@ make test-orders    # Test order execution (safe)
 make paper          # Local paper trading with virtual portfolio
 make paper-yahoo    # Paper trading with Yahoo Finance data
 make paper-ccxt     # Paper trading with crypto exchange data
+make paper-ibkr     # Paper trading with IBKR data
 make sandbox        # Exchange testnet trading
 make live           # Live trading (real money!)
 make status         # Show current configuration
 make logs           # Show recent logs
+```
+
+### IBKR Commands
+```bash
+make ibkr-test      # Test IBKR connection and functionality
+make ibkr-paper     # IBKR paper trading mode
+make ibkr-live      # IBKR live trading (REAL MONEY!)
 ```
 
 ### Safety Checks
@@ -229,6 +252,14 @@ trading-bot/
 ├── config/                 # Configuration
 │   └── settings.py         # Settings management
 ├── data/                   # Data sources
+│   ├── ccxt_source.py      # Cryptocurrency exchange data
+│   ├── yahoo_finance.py    # Stock market data
+│   ├── ibkr_source.py      # IBKR professional data source
+│   ├── ibkr_connection.py  # IBKR connection management
+│   └── ibkr_sync_wrapper.py # IBKR synchronous wrapper
+├── config/                 # Configuration
+│   ├── settings.py         # Main configuration
+│   └── ibkr_config.py      # IBKR-specific configuration
 └── utils/                  # Utilities
 ```
 
@@ -338,12 +369,14 @@ make test-orders
 
 ## ⚖️ Disclaimer
 
-**This software is for educational purposes. Trading cryptocurrencies involves substantial risk of loss. Use at your own risk.**
+**This software is for educational and research purposes. Trading financial instruments involves substantial risk of loss. Use at your own risk.**
 
-- 💰 You are responsible for all trading decisions
+- 🚧 **Under Development**: This framework is actively being developed and is not production-ready
+- 💰 You are responsible for all trading decisions and outcomes
 - 📉 Past performance does not guarantee future results
-- 🔍 Always review and test thoroughly before live trading
-- 💡 Start with small amounts and paper trading
+- 🔍 Always thoroughly test strategies before any live trading
+- 💡 Start with paper trading and small amounts when going live
+- 📊 Suitable for learning algorithmic trading concepts and strategy development
 
 ## 📄 License
 
@@ -351,4 +384,6 @@ MIT License - see LICENSE file for details.
 
 ---
 
-🤖 **Happy Trading!** Remember: Test first, trade smart, manage risk.
+🤖 **Happy Learning & Trading!** Remember: Education first, test thoroughly, trade smart, manage risk.
+
+> **Status**: 🚧 Active development - Production deployment planned for the future
