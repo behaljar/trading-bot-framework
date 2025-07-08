@@ -30,7 +30,10 @@ make test-orders
 
 ### 4. Start Paper Trading
 ```bash
-# Start sandbox trading (safe)
+# Local paper trading with virtual portfolio
+make paper
+
+# Or start sandbox trading with exchange testnet
 make sandbox
 ```
 
@@ -49,7 +52,8 @@ make live
 ## 🎯 Features
 
 ### 🔒 Safety First
-- **Sandbox Mode**: Test with real market data, no real money
+- **Paper Trading**: Local simulation with virtual portfolio and realistic execution
+- **Sandbox Mode**: Test with real market data on exchange testnets
 - **State Persistence**: Crash-resistant with automatic recovery
 - **Position Sync**: Handles pre-existing positions on restart
 - **Daily Loss Limits**: Automatic emergency stops
@@ -111,6 +115,43 @@ INITIAL_CAPITAL=1000      # Your trading capital
 
 See [Configuration Guide](docs/CONFIGURATION.md) for complete options.
 
+## 📊 Paper Trading
+
+### Local Paper Trading
+The built-in paper trader provides realistic simulation without using real money or exchange APIs:
+
+```bash
+# Start with default settings (Yahoo Finance data)
+make paper
+
+# Paper trading with different data sources
+make paper-yahoo    # Stock market data
+make paper-ccxt     # Cryptocurrency data
+
+# Custom paper trading
+python scripts/run_paper_trading.py \
+  --source yahoo \
+  --symbols AAPL MSFT GOOGL \
+  --initial-capital 50000 \
+  --commission 0.001 \
+  --spread 10 \
+  --slippage 5
+```
+
+### Paper Trading Features
+- **Virtual Portfolio**: Track positions, balance, and P&L
+- **Realistic Execution**: Simulates spreads, slippage, and commissions
+- **Performance Metrics**: Sharpe ratio, max drawdown, win rate, etc.
+- **State Persistence**: Resume trading sessions after interruption
+- **Multiple Data Sources**: Yahoo Finance, CCXT, or CSV files
+
+### Performance Report
+The paper trader generates comprehensive reports including:
+- Total and annualized returns
+- Risk metrics (volatility, Sharpe ratio, max drawdown)
+- Trading statistics (win rate, profit factor, expectancy)
+- Trade history and position analysis
+
 ## 🚀 Usage
 
 ### Development Commands
@@ -124,7 +165,10 @@ make clean          # Clean Python cache
 ### Trading Commands
 ```bash
 make test-orders    # Test order execution (safe)
-make sandbox        # Paper trading with testnet
+make paper          # Local paper trading with virtual portfolio
+make paper-yahoo    # Paper trading with Yahoo Finance data
+make paper-ccxt     # Paper trading with crypto exchange data
+make sandbox        # Exchange testnet trading
 make live           # Live trading (real money!)
 make status         # Show current configuration
 make logs           # Show recent logs
@@ -153,22 +197,30 @@ cat data/state/positions.json
 
 ### Performance Tracking
 The bot automatically tracks:
-- 📈 Daily P&L
+- 📈 Daily P&L and returns
 - 💰 Current positions
 - 📋 Order history
 - ⚠️ Error rates
 - 💾 State persistence
+- 📊 Risk metrics (Sharpe ratio, max drawdown, volatility)
+- 🎯 Trading statistics (win rate, profit factor, expectancy)
 
 ## 🏗️ Architecture
 
 ```
 trading-bot/
-├── execution/ccxt/          # Live trading engine
-│   ├── ccxt_trader.py      # Main trading logic
-│   ├── state_persistence.py # State management interface
-│   ├── file_state_store.py # File-based storage
-│   ├── position_sync.py    # Position synchronization
-│   └── data_manager.py     # Data caching
+├── execution/
+│   ├── ccxt/               # Live trading engine
+│   │   ├── ccxt_trader.py  # Main trading logic
+│   │   ├── state_persistence.py # State management interface
+│   │   ├── file_state_store.py # File-based storage
+│   │   ├── position_sync.py # Position synchronization
+│   │   └── data_manager.py # Data caching
+│   └── paper/              # Paper trading engine
+│       ├── paper_trader.py # Paper trading logic
+│       ├── virtual_portfolio.py # Virtual portfolio management
+│       ├── order_simulator.py # Order execution simulation
+│       └── performance_tracker.py # Performance metrics
 ├── strategies/             # Trading strategies
 │   ├── trend_following.py  # SMA strategy
 │   ├── mean_reversion.py   # RSI strategy
@@ -189,8 +241,9 @@ trading-bot/
 - 🚫 Never commit `.env` to version control
 
 ### Trading Safety
-- 🧪 Always test with sandbox mode first
-- 💰 Start with small capital amounts
+- 📊 Start with paper trading to validate strategies
+- 🧪 Then test with sandbox mode using real market data
+- 💰 Start with small capital amounts in live trading
 - 📊 Monitor trades closely initially
 - 🛑 Set appropriate stop losses
 - 📱 Enable exchange notifications
@@ -199,6 +252,9 @@ trading-bot/
 
 ### Testing & Diagnostics
 ```bash
+# Test strategy with paper trading
+make paper
+
 # Test position synchronization
 make test-positions
 
@@ -272,6 +328,9 @@ make test
 
 # Test specific strategy
 python -m pytest tests/test_strategies.py::TestSMAStrategy
+
+# Test paper trading components
+python -m pytest tests/test_paper_trader.py
 
 # Test order execution
 make test-orders

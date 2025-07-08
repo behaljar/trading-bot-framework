@@ -1,0 +1,37 @@
+
+================================================================================
+                        PAPER TRADING PERFORMANCE REPORT
+================================================================================
+
+RETURNS
+-------
+Total Return:               -0.13%
+Annual Return:             -38.91%
+Sharpe Ratio:                 0.00
+
+RISK METRICS
+------------
+Annual Volatility:           0.00%
+Max Drawdown:                0.07%
+Max DD Duration:                 0 days
+
+TRADING STATISTICS
+------------------
+Total Trades:                   11
+Win Rate:                    0.00%
+Profit Factor:                0.00
+Expectancy:             $     -0.50
+
+Average Win:            $      0.00
+Average Loss:           $      0.50
+
+PORTFOLIO SUMMARY
+-----------------
+Initial Balance:        $ 10,000.00
+Final Balance:          $  9,986.51
+Total P&L:              $    -13.49
+Total Commission:       $      5.50
+
+Trading Period:                  1 days
+================================================================================
+        

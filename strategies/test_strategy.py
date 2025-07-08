@@ -43,9 +43,17 @@ class TestStrategy(BaseStrategy):
         # Create signals series
         signals = pd.Series([Signal.HOLD.value] * len(data), index=data.index)
         
-        # For testing: always generate BUY signal on every new bar
-        # The trader will handle position checking and decide whether to buy or sell
-        signals.iloc[-1] = Signal.BUY.value
+        # For testing: alternate between BUY and SELL signals
+        # Generate a signal every few bars to avoid too frequent trading
+        signal_frequency = 5  # Generate signal every 5 bars
+        
+        for i in range(signal_frequency - 1, len(data), signal_frequency):
+            # Alternate between BUY and SELL based on position
+            signal_count = i // signal_frequency
+            if signal_count % 2 == 0:
+                signals.iloc[i] = Signal.BUY.value
+            else:
+                signals.iloc[i] = Signal.SELL.value
         
         return signals
         

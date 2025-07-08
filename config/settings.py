@@ -40,6 +40,11 @@ class TradingConfig:
     # Trading settings
     commission: float = float(get_env_value("COMMISSION", "0.001"))  # Crypto has lower fees
     slippage: float = float(get_env_value("SLIPPAGE", "0.0005"))
+    
+    # Paper trading settings
+    paper_commission_rate: float = float(get_env_value("PAPER_COMMISSION_RATE", "0.001"))
+    paper_spread_bps: float = float(get_env_value("PAPER_SPREAD_BPS", "10"))
+    paper_slippage_bps: float = float(get_env_value("PAPER_SLIPPAGE_BPS", "5"))
 
     # API keys (from environment variables)
     api_key: str = get_env_value("EXCHANGE_API_KEY", "")
@@ -52,6 +57,10 @@ class TradingConfig:
     # Monitoring
     alert_email: str = get_env_value("ALERT_EMAIL", "")
     log_level: str = get_env_value("LOG_LEVEL", "INFO")
+    
+    # Additional settings for paper trading
+    state_directory: str = get_env_value("STATE_DIRECTORY", "data/state")
+    data_lookback_days: int = int(get_env_value("DATA_LOOKBACK_DAYS", "30"))
 
     def __post_init__(self) -> None:
         # Load symbols from environment variable (comma-separated)

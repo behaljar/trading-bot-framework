@@ -56,6 +56,19 @@ test-positions:
 	python tests/test_ccxt_positions.py
 
 # === TRADING ===
+paper:
+	@echo "📄 Starting local paper trading simulation..."
+	@echo "💡 This runs a local simulation with virtual portfolio"
+	python scripts/run_paper_trading.py
+
+paper-yahoo:
+	@echo "📄 Starting paper trading with Yahoo Finance data..."
+	python scripts/run_paper_trading.py --source yahoo --symbols AAPL MSFT GOOGL
+
+paper-ccxt:
+	@echo "📄 Starting paper trading with CCXT data..."
+	python scripts/run_paper_trading.py --source ccxt --symbols BTC/USDT ETH/USDT
+
 sandbox:
 	@echo "📄 Starting SANDBOX trading (safe with testnet)..."
 	@echo "⚠️  Using testnet/sandbox - no real money at risk"

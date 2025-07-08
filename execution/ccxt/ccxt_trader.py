@@ -14,6 +14,7 @@ from .state_persistence import StateStore
 from .file_state_store import FileStateStore
 from .position_sync import PositionSynchronizer
 from .data_manager import DataManager
+from risk.position_calculator import PositionCalculator
 
 
 class OrderStatus(Enum):
@@ -61,6 +62,13 @@ class CCXTTrader:
         self.orders = {}
         self.daily_pnl = 0.0
         self.initial_balance = None
+        
+        # Position calculator
+        self.position_calc = PositionCalculator(
+            balance_percentage=0.1,  # 10% of balance per trade
+            risk_percentage=0.02,    # 2% risk per trade
+            max_position_pct=config.max_position_size
+        )
         
         # Try to acquire lock
         lock_id = f"trader_{config.exchange_name}_{datetime.now().isoformat()}"
@@ -350,7 +358,7 @@ class CCXTTrader:
                 
         return {'type': 'hold', 'size': 0}
         
-    def _calculate_position_size(self, current_price: float, strategy) -> float:
+    def _calculate_position_size(self, current_price: float, strategy, stop_loss: float = None) -> float:
         """Calculate position size based on risk management rules"""
         # Get account balance
         try:
@@ -363,14 +371,13 @@ class CCXTTrader:
             self.logger.warning(f"Could not get balance, using fallback: {e}")
             available_balance = self.config.initial_capital * 0.1  # Conservative fallback
             
-        # Apply max position size limit
-        max_position_value = min(
-            available_balance * 0.95,  # Use 95% of available balance max
-            self.config.initial_capital * self.config.max_position_size
+        # Use position calculator to determine size
+        position_size = self.position_calc.calculate_position_size(
+            balance=available_balance,
+            entry_price=current_price,
+            stop_loss=stop_loss,
+            position_type='long'  # Assume long for now, can be parameterized
         )
-        
-        # Calculate size in base currency
-        position_size = max_position_value / current_price
         
         # Apply strategy-specific sizing if available
         if hasattr(strategy, 'get_position_size'):
