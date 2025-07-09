@@ -132,7 +132,7 @@ def main():
     print("=" * 50)
     
     # Load IBKR configuration
-    env_files = ['.env.ibkr.paper', '.env']
+    env_files = ['.env']
     env_loaded = False
     
     for env_file in env_files:

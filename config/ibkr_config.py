@@ -75,7 +75,7 @@ class IBKRConfig:
         account_type = IBKRAccountType.PAPER if account_type_str == 'paper' else IBKRAccountType.LIVE
         
         # Default ports based on account type
-        default_port = 7497 if account_type == IBKRAccountType.PAPER else 7496
+        default_port = 4002 if account_type == IBKRAccountType.PAPER else 7496
         
         # Market data type
         market_data_type_int = int(os.getenv('IBKR_MARKET_DATA_TYPE', '3'))

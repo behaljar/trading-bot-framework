@@ -173,7 +173,7 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     
     # Try to load IBKR configuration
-    env_files = ['.env.ibkr.paper', '.env.ibkr.live', '.env']
+    env_files = ['.env']
     env_loaded = False
     
     for env_file in env_files:
