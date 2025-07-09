@@ -160,7 +160,7 @@ class IBKRConnectionManager:
                 host=self.config.host,
                 port=self.config.port,
                 clientId=self.config.client_id,
-                timeout=self.config.connect_timeout,
+                timeout=30,  # Increased timeout
                 readonly=False  # We need trading permissions
             )
             
@@ -170,8 +170,12 @@ class IBKRConnectionManager:
             # Verify account access
             if self.config.account_id:
                 managed_accounts = self.ib.managedAccounts()
+                self.logger.info(f"Managed accounts: {managed_accounts}")
+                self.logger.info(f"Configured account ID: '{self.config.account_id}'")
                 if self.config.account_id not in managed_accounts:
                     raise ValueError(f"Account {self.config.account_id} not accessible. Available: {managed_accounts}")
+            else:
+                self.logger.info("No account ID configured - using default account")
             
             return self.connected
             

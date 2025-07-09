@@ -51,6 +51,21 @@ class IBKRConfig:
     # Logging
     log_level: str = "INFO"
     
+    @staticmethod
+    def _clean_env_value(value: str) -> Optional[str]:
+        """Clean environment variable value by removing inline comments"""
+        if not value:
+            return None
+        
+        # Remove inline comments (everything after #)
+        cleaned = value.split('#')[0].strip()
+        
+        # Return None if empty or just whitespace
+        if not cleaned or cleaned.isspace():
+            return None
+            
+        return cleaned
+    
     @classmethod
     def from_env(cls) -> 'IBKRConfig':
         """Create configuration from environment variables"""
@@ -71,7 +86,7 @@ class IBKRConfig:
             port=int(os.getenv('IBKR_PORT', str(default_port))),
             client_id=int(os.getenv('IBKR_CLIENT_ID', '1')),
             account_type=account_type,
-            account_id=os.getenv('IBKR_ACCOUNT_ID'),
+            account_id=cls._clean_env_value(os.getenv('IBKR_ACCOUNT_ID')),
             market_data_type=market_data_type,
             connect_timeout=int(os.getenv('IBKR_CONNECT_TIMEOUT', '10')),
             read_timeout=int(os.getenv('IBKR_READ_TIMEOUT', '30')),

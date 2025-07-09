@@ -28,6 +28,7 @@ help:
 	@echo ""
 	@echo "🏦 IBKR INTEGRATION:"
 	@echo "  make ibkr-test   - Test IBKR connection"
+	@echo "  make ibkr-test-execution - Test IBKR execution engine"
 	@echo "  make ibkr-paper  - IBKR paper trading"
 	@echo "  make ibkr-live   - IBKR live trading (REAL MONEY!)"
 	@echo ""
@@ -104,6 +105,12 @@ ibkr-live:
 	@echo "⚠️  Make sure your .env is configured for IBKR live trading"
 	@read -p "Are you sure you want to trade with REAL money? (yes/no): " confirm && [ "$$confirm" = "yes" ]
 	python trading_bot/main.py
+
+# Test IBKR execution engine
+ibkr-test-execution:
+	@echo "🧪 Testing IBKR execution engine..."
+	@echo "⚠️  Make sure TWS/IB Gateway is running and configured"
+	python tests/test_ibkr_execution.py
 
 sandbox:
 	@echo "📄 Starting SANDBOX trading (safe with testnet)..."
