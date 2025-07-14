@@ -55,9 +55,9 @@ python scripts/generate_sample_data.py
 ### Configuration System
 - Environment-based configuration via `.env` file and environment variables
 - `config/settings.py` - Main configuration class with environment variable parsing
-- **Live Trading**: Only CCXT data source supported (`DATA_SOURCE=ccxt`)
+- **Live Trading**: CCXT and IBKR data sources supported (`DATA_SOURCE=ccxt` or `DATA_SOURCE=ibkr`)
 - Strategy parameters configurable via `STRATEGY_*` environment variables
-- Multiple config templates: `.env.sandbox`, `.env.live`, `.env.test`
+- Multiple config templates: `.env.sandbox`, `.env.live`, `.env.test`, `.env.ibkr.live`
 
 ### Data Layer Architecture
 - **Base**: `data/base_data_source.py` - Abstract interface
@@ -73,12 +73,18 @@ python scripts/generate_sample_data.py
 - **Built-in**: SMA crossover (`trend_following.py`), Z-Score mean reversion (`mean_reversion.py`)
 
 ### Key Components
-- **Live Execution**: `execution/ccxt/` - Live trading with CCXT exchanges
-  - `ccxt_trader.py` - Main trading engine with error handling and state management
-  - `state_persistence.py` - Abstract state storage interface (supports PostgreSQL migration)
-  - `file_state_store.py` - File-based state storage implementation
-  - `position_sync.py` - Position synchronization with exchange
-  - `data_manager.py` - Efficient historical data caching
+- **Live Execution**: 
+  - `execution/ccxt/` - Live trading with CCXT exchanges
+    - `ccxt_trader.py` - Main trading engine with error handling and state management
+    - `state_persistence.py` - Abstract state storage interface (supports PostgreSQL migration)
+    - `file_state_store.py` - File-based state storage implementation
+    - `position_sync.py` - Position synchronization with exchange
+    - `data_manager.py` - Efficient historical data caching
+  - `execution/ibkr/` - Live trading with Interactive Brokers
+    - `ibkr_trader.py` - Async IBKR trading engine with comprehensive error handling
+    - `ibkr_sync_trader.py` - Synchronous wrapper for main.py integration
+    - `ibkr_state_store.py` - IBKR-specific state persistence
+    - `ibkr_position_sync.py` - Position synchronization with IBKR account
 - **Risk Management**: `risk/risk_manager.py` - Position sizing and risk controls
 - **Monitoring**: `monitoring/alert_system.py` - Alert and notification system
 - **Logging**: `utils/logger.py` - Centralized logging with date-based log files
@@ -86,7 +92,7 @@ python scripts/generate_sample_data.py
 
 ### Data Flow
 1. Configuration loaded from environment variables
-2. CCXTTrader initialized with exchange connection and state recovery
+2. Trader initialized based on `DATA_SOURCE` (CCXT or IBKR) with connection and state recovery
 3. Strategy selected based on `STRATEGY_NAME` (defaults to SMA if unknown)
 4. Main loop for each symbol:
    - Fetch/cache historical data for signal generation

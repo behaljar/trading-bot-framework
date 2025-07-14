@@ -71,6 +71,9 @@ class IBKRTrader:
         self.daily_pnl = 0.0
         self.initial_balance = None
         
+        # Event loop management
+        self._persistent_loop = None
+        
         # Position calculator
         self.position_calc = PositionCalculator(
             balance_percentage=0.1,  # 10% of balance per trade
@@ -96,6 +99,14 @@ class IBKRTrader:
     def __del__(self):
         """Cleanup on destruction"""
         try:
+            # Clean up persistent loop
+            if hasattr(self, '_persistent_loop') and self._persistent_loop and not self._persistent_loop.is_closed():
+                try:
+                    self._persistent_loop.close()
+                except:
+                    pass
+            
+            # Release lock
             if hasattr(self, 'state_store') and hasattr(self, 'lock_id'):
                 self.state_store.release_lock(self.lock_id)
         except:
@@ -346,15 +357,32 @@ class IBKRTrader:
     async def get_account_balance(self) -> Dict[str, float]:
         """Get account balance information"""
         try:
-            account_summary = await self.position_sync.get_account_summary()
+            # Get account summary directly using the connection manager
+            if not self.connection_manager.is_connected():
+                await self.connection_manager.connect()
+            
+            account_summary = self.connection_manager.ib.accountSummary()
+            
+            summary = {}
+            for item in account_summary:
+                if hasattr(item, 'tag') and hasattr(item, 'value'):
+                    try:
+                        # Convert common numeric fields
+                        if item.tag in ['TotalCashValue', 'NetLiquidation', 'UnrealizedPnL', 
+                                       'RealizedPnL', 'BuyingPower', 'GrossPositionValue']:
+                            summary[item.tag] = float(item.value)
+                        else:
+                            summary[item.tag] = item.value
+                    except (ValueError, TypeError):
+                        summary[item.tag] = item.value
             
             balance_info = {
-                'total_cash': account_summary.get('TotalCashValue', 0.0),
-                'net_liquidation': account_summary.get('NetLiquidation', 0.0),
-                'unrealized_pnl': account_summary.get('UnrealizedPnL', 0.0),
-                'realized_pnl': account_summary.get('RealizedPnL', 0.0),
-                'buying_power': account_summary.get('BuyingPower', 0.0),
-                'gross_position_value': account_summary.get('GrossPositionValue', 0.0)
+                'total_cash': summary.get('TotalCashValue', 0.0),
+                'net_liquidation': summary.get('NetLiquidation', 0.0),
+                'unrealized_pnl': summary.get('UnrealizedPnL', 0.0),
+                'realized_pnl': summary.get('RealizedPnL', 0.0),
+                'buying_power': summary.get('BuyingPower', 0.0),
+                'gross_position_value': summary.get('GrossPositionValue', 0.0)
             }
             
             return balance_info
@@ -542,3 +570,408 @@ class IBKRTrader:
             self.logger.warning("EMERGENCY STOP ACTIVATED - All trading halted")
         else:
             self.logger.info("Emergency stop deactivated")
+    
+    def _run_async_method(self, async_method, *args, **kwargs):
+        """Helper method to run async methods synchronously"""
+        try:
+            # Check if there's already a running event loop
+            try:
+                current_loop = asyncio.get_running_loop()
+                # If we're in a running loop, we can't use run_until_complete
+                # Instead, we need to use a thread
+                import concurrent.futures
+                import threading
+                
+                def run_in_thread():
+                    # Create new loop in thread
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(async_method(*args, **kwargs))
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_thread)
+                    return future.result(timeout=30)  # 30 second timeout
+                    
+            except RuntimeError:
+                # No running loop, we can create our own
+                if not hasattr(self, '_persistent_loop') or self._persistent_loop is None or self._persistent_loop.is_closed():
+                    self._persistent_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(self._persistent_loop)
+                
+                return self._persistent_loop.run_until_complete(async_method(*args, **kwargs))
+            
+        except Exception as e:
+            self.logger.error(f"Error running async method: {e}")
+            raise
+    
+    def run_trading_cycle(self, symbol: str, strategy):
+        """Run a single trading cycle synchronously (for main.py compatibility)"""
+        try:
+            # Check if we're initialized
+            if not hasattr(self, 'connection_manager') or not self.connection_manager.is_connected():
+                self.logger.error("IBKR trader not initialized or not connected")
+                return
+            
+            # Safety checks
+            if self.emergency_stop:
+                self.logger.error("Emergency stop active - no trading")
+                return
+                
+            if abs(self.daily_pnl) > self.daily_loss_limit:
+                self.logger.error(f"Daily loss limit reached: {self.daily_pnl}")
+                self.emergency_stop = True
+                return
+            
+            # Get real data and generate actual signals
+            try:
+                # Get current positions using existing connection
+                positions = self._run_async_method(self.get_positions)
+                current_position = positions.get(symbol, {})
+                position_size = current_position.get('size', 0)
+                
+                # Get real current price from IBKR
+                current_price = self._get_current_price_simple(symbol)
+                
+                # Get historical data for signal generation
+                historical_data = self._get_historical_data_simple(symbol, strategy)
+                
+                if historical_data is not None and len(historical_data) >= getattr(strategy, 'min_bars_required', 20):
+                    # Generate real signals
+                    signals = strategy.generate_signals(historical_data)
+                    latest_signal = signals.iloc[-1]
+                    
+                    # Log trading cycle info with current price
+                    self.logger.info(f"Trading cycle for {symbol}: Price=${current_price:.2f}, Position={position_size}, P&L=${self.daily_pnl:.2f}")
+                    
+                    # Determine action based on signal and position
+                    action = self._determine_trading_action(latest_signal, position_size)
+                    
+                    # Log the action
+                    if action == 'buy':
+                        self.logger.info(f"BUY signal for {symbol} at ${current_price:.2f}")
+                        self._execute_buy_order(symbol, current_price)
+                    elif action == 'sell':
+                        self.logger.info(f"SELL signal for {symbol} at ${current_price:.2f}")
+                        self._execute_sell_order(symbol, current_price, abs(position_size))
+                    else:
+                        self.logger.info(f"HOLD signal for {symbol} at ${current_price:.2f}")
+                else:
+                    self.logger.warning(f"Insufficient historical data for {symbol} - cannot generate signals")
+                    self.logger.info(f"Current price for {symbol}: ${current_price:.2f}, Position={position_size}")
+                
+            except Exception as e:
+                self.logger.error(f"Error in trading cycle for {symbol}: {e}")
+                
+        except Exception as e:
+            self.logger.error(f"Error in trading cycle for {symbol}: {e}")
+    
+    def _get_current_price_simple(self, symbol: str) -> float:
+        """Get current price using existing IBKR connection"""
+        try:
+            # Create contract
+            contract = self.connection_manager.create_contract(symbol, 'STK')
+            
+            # Qualify the contract first to populate conId
+            qualified_contracts = self.connection_manager.ib.qualifyContracts(contract)
+            if not qualified_contracts:
+                self.logger.error(f"Could not qualify contract for {symbol}")
+                return 0.0
+            
+            qualified_contract = qualified_contracts[0]
+            
+            # Get ticker data using qualified contract with delayed data allowed
+            ticker = self.connection_manager.ib.reqMktData(qualified_contract, '', False, False)
+            
+            # Wait for market data to arrive
+            import time
+            max_wait = 3.0  # Maximum wait time
+            wait_interval = 0.1
+            waited = 0.0
+            
+            while waited < max_wait:
+                time.sleep(wait_interval)
+                waited += wait_interval
+                
+                # Try to get price from ticker in order of preference
+                if hasattr(ticker, 'marketPrice') and ticker.marketPrice() > 0:
+                    price = float(ticker.marketPrice())
+                    self.logger.debug(f"Got market price for {symbol}: ${price:.2f}")
+                    return price
+                elif hasattr(ticker, 'last') and ticker.last > 0:
+                    price = float(ticker.last)
+                    self.logger.debug(f"Got last price for {symbol}: ${price:.2f}")
+                    return price
+                elif hasattr(ticker, 'close') and ticker.close > 0:
+                    price = float(ticker.close)
+                    self.logger.debug(f"Got close price for {symbol}: ${price:.2f}")
+                    return price
+                elif hasattr(ticker, 'bid') and ticker.bid > 0 and hasattr(ticker, 'ask') and ticker.ask > 0:
+                    price = (float(ticker.bid) + float(ticker.ask)) / 2.0
+                    self.logger.debug(f"Got bid/ask midpoint for {symbol}: ${price:.2f}")
+                    return price
+                elif hasattr(ticker, 'bid') and ticker.bid > 0:
+                    price = float(ticker.bid)
+                    self.logger.debug(f"Got bid price for {symbol}: ${price:.2f}")
+                    return price
+                elif hasattr(ticker, 'ask') and ticker.ask > 0:
+                    price = float(ticker.ask)
+                    self.logger.debug(f"Got ask price for {symbol}: ${price:.2f}")
+                    return price
+            
+            # If we still don't have price data, try to get delayed data from recent bars
+            try:
+                bars = self.connection_manager.ib.reqHistoricalData(
+                    qualified_contract,
+                    endDateTime='',
+                    durationStr='1 D',
+                    barSizeSetting='1 min',
+                    whatToShow='MIDPOINT',
+                    useRTH=False,
+                    formatDate=1
+                )
+                
+                if bars and len(bars) > 0:
+                    latest_bar = bars[-1]
+                    price = float(latest_bar.close)
+                    self.logger.debug(f"Got historical close price for {symbol}: ${price:.2f}")
+                    return price
+                    
+            except Exception as hist_e:
+                self.logger.debug(f"Could not get historical price for {symbol}: {hist_e}")
+            
+            self.logger.warning(f"No price data available for {symbol} after {max_wait}s")
+            return 0.0
+                
+        except Exception as e:
+            self.logger.error(f"Error getting real price for {symbol}: {e}")
+            return 0.0
+    
+    def _get_historical_data_simple(self, symbol: str, strategy) -> Optional[Any]:
+        """Get historical data using existing IBKR connection"""
+        try:
+            # Create contract
+            contract = self.connection_manager.create_contract(symbol, 'STK')
+            
+            # Qualify the contract first to populate conId
+            qualified_contracts = self.connection_manager.ib.qualifyContracts(contract)
+            if not qualified_contracts:
+                self.logger.error(f"Could not qualify contract for {symbol}")
+                return None
+            
+            qualified_contract = qualified_contracts[0]
+            
+            # Determine how much data we need
+            bars_needed = getattr(strategy, 'min_bars_required', 50)
+            
+            # Map timeframes
+            timeframe_map = {
+                '1m': '1 min',
+                '5m': '5 mins', 
+                '15m': '15 mins',
+                '30m': '30 mins',
+                '1h': '1 hour',
+                '4h': '4 hours',
+                '1d': '1 day'
+            }
+            
+            # Get timeframe from config
+            tf = getattr(self.config, 'timeframe', '1h')
+            bar_size = timeframe_map.get(tf, '1 hour')
+            
+            # Calculate duration
+            duration = f"{bars_needed * 2} D"  # Get enough days
+            
+            # Request historical data with qualified contract
+            bars = self.connection_manager.ib.reqHistoricalData(
+                qualified_contract,
+                endDateTime='',
+                durationStr=duration,
+                barSizeSetting=bar_size,
+                whatToShow='MIDPOINT',
+                useRTH=True,
+                formatDate=1
+            )
+            
+            if bars:
+                # Convert to DataFrame
+                import pandas as pd
+                data = []
+                for bar in bars:
+                    data.append({
+                        'datetime': bar.date,
+                        'open': bar.open,
+                        'high': bar.high,
+                        'low': bar.low,
+                        'close': bar.close,
+                        'volume': bar.volume
+                    })
+                
+                df = pd.DataFrame(data)
+                df['datetime'] = pd.to_datetime(df['datetime'])
+                df.set_index('datetime', inplace=True)
+                
+                self.logger.info(f"Retrieved {len(df)} bars of historical data for {symbol}")
+                return df
+            else:
+                self.logger.warning(f"No historical data received for {symbol}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error getting historical data for {symbol}: {e}")
+            return None
+    
+    def _determine_trading_action(self, signal, position_size: float) -> str:
+        """Determine trading action based on signal and current position"""
+        from strategies.base_strategy import Signal
+        
+        if signal == Signal.BUY and position_size <= 0:
+            return 'buy'
+        elif signal == Signal.SELL and position_size > 0:
+            return 'sell'
+        else:
+            return 'hold'
+    
+    def _execute_buy_order(self, symbol: str, price: float):
+        """Execute a buy order"""
+        try:
+            # Calculate position size (simple approach)
+            position_size = 1.0  # Default to 1 share for now
+            
+            # Place market order
+            order = self._run_async_method(self.place_market_order, symbol, 'buy', position_size)
+            
+            if order:
+                self.logger.info(f"Placed buy order for {symbol}: {order.id}")
+            else:
+                self.logger.error(f"Failed to place buy order for {symbol}")
+                
+        except Exception as e:
+            self.logger.error(f"Error executing buy order for {symbol}: {e}")
+    
+    def _execute_sell_order(self, symbol: str, price: float, size: float):
+        """Execute a sell order"""
+        try:
+            # Place market order to close position
+            order = self._run_async_method(self.place_market_order, symbol, 'sell', size)
+            
+            if order:
+                self.logger.info(f"Placed sell order for {symbol}: {order.id}")
+            else:
+                self.logger.error(f"Failed to place sell order for {symbol}")
+                
+        except Exception as e:
+            self.logger.error(f"Error executing sell order for {symbol}: {e}")
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get performance summary synchronously (for main.py compatibility)"""
+        try:
+            # Get positions
+            positions = self._run_async_method(self.get_positions)
+            
+            return {
+                'daily_pnl': self.daily_pnl,
+                'open_positions': len(positions),
+                'positions': positions,
+                'emergency_stop': self.emergency_stop,
+                'initial_balance': self.initial_balance or 0.0
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting performance summary: {e}")
+            return {
+                'daily_pnl': 0.0,
+                'open_positions': 0,
+                'positions': {},
+                'emergency_stop': False,
+                'initial_balance': 0.0
+            }
+    
+    def initialize_sync(self) -> bool:
+        """Initialize the trader synchronously (for main.py compatibility)"""
+        try:
+            return self._run_async_method(self.initialize)
+        except Exception as e:
+            self.logger.error(f"Error initializing trader: {e}")
+            return False
+    
+    def shutdown_sync(self):
+        """Shutdown the trader synchronously (for main.py compatibility)"""
+        try:
+            self.logger.info("Starting IBKR trader shutdown...")
+            
+            # Set a flag to prevent new operations
+            self.emergency_stop = True
+            
+            # Save current state first
+            try:
+                self._save_state()
+                self.logger.info("State saved successfully")
+            except Exception as e:
+                self.logger.error(f"Error saving state during shutdown: {e}")
+            
+            # Shutdown with timeout to prevent hanging
+            import threading
+            import time
+            
+            shutdown_complete = threading.Event()
+            error_occurred = threading.Event()
+            
+            def shutdown_worker():
+                try:
+                    self._run_async_method(self.shutdown)
+                    
+                    # Clean up the persistent loop
+                    if hasattr(self, '_persistent_loop') and self._persistent_loop and not self._persistent_loop.is_closed():
+                        try:
+                            # Cancel all pending tasks
+                            pending = asyncio.all_tasks(self._persistent_loop)
+                            for task in pending:
+                                task.cancel()
+                            
+                            # Wait for cancellation
+                            if pending:
+                                self._persistent_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                            
+                            # Close the loop
+                            self._persistent_loop.close()
+                        except Exception as e:
+                            self.logger.debug(f"Error cleaning up persistent loop: {e}")
+                        finally:
+                            self._persistent_loop = None
+                    
+                    shutdown_complete.set()
+                except Exception as e:
+                    self.logger.error(f"Error in shutdown worker: {e}")
+                    error_occurred.set()
+            
+            # Start shutdown in a separate thread
+            shutdown_thread = threading.Thread(target=shutdown_worker, daemon=True)
+            shutdown_thread.start()
+            
+            # Wait for shutdown to complete with timeout
+            if shutdown_complete.wait(timeout=10):
+                self.logger.info("IBKR trader shutdown completed successfully")
+            elif error_occurred.is_set():
+                self.logger.error("Error occurred during shutdown")
+            else:
+                self.logger.warning("Shutdown timed out after 10 seconds - forcing exit")
+            
+            # Force cleanup if needed
+            try:
+                if hasattr(self, 'connection_manager') and self.connection_manager:
+                    # Force disconnect if still connected
+                    if hasattr(self.connection_manager, 'ib') and self.connection_manager.ib:
+                        try:
+                            self.connection_manager.ib.disconnect()
+                        except:
+                            pass
+            except Exception as e:
+                self.logger.debug(f"Error in force cleanup: {e}")
+                
+        except Exception as e:
+            self.logger.error(f"Error shutting down trader: {e}")
+        finally:
+            self.logger.info("IBKR trader shutdown process completed")
