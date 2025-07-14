@@ -1,14 +1,16 @@
 """
 Basic configuration
 """
+import logging
 import os
 from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
 import yaml
 from dotenv import load_dotenv
 
-# Load environment variables from .env file, ignoring comments
-load_dotenv(override=True)
+# Load environment variables from .env file only if not already set
+# This allows Docker Compose to take precedence
+load_dotenv(override=False)
 
 def get_env_value(key: str, default: str = "") -> str:
     """Get environment variable value, stripping inline comments"""
@@ -46,8 +48,8 @@ class TradingConfig:
     paper_slippage_bps: float = float(get_env_value("PAPER_SLIPPAGE_BPS", "5"))
 
     # API keys (from environment variables)
-    api_key: str = get_env_value("EXCHANGE_API_KEY", "")
-    api_secret: str = get_env_value("EXCHANGE_API_SECRET", "")
+    api_key: str = get_env_value("EXCHANGE_API_KEY", "6507ca0b9ec46cca4e194e8602e416a6debc60e0f1fa443950340e0e43a75b81")
+    api_secret: str = get_env_value("EXCHANGE_API_SECRET", "4bfbd23f1f58e23705e64c9fd7345ff2e97856737606f85a11738d562bd52621")
     
     # Trading mode settings
     allow_short: bool = get_env_value("ALLOW_SHORT", "false").lower() == "true"
@@ -56,6 +58,7 @@ class TradingConfig:
     # Monitoring
     alert_email: str = get_env_value("ALERT_EMAIL", "")
     log_level: str = get_env_value("LOG_LEVEL", "INFO")
+    use_json_logs: bool = get_env_value("USE_JSON_LOGS", "true").lower() == "true"
     
     # Additional settings for paper trading
     state_directory: str = get_env_value("STATE_DIRECTORY", "data/state")

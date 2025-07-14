@@ -28,5 +28,5 @@ bokeh>=3.0.0
 streamlit>=1.28.0          # For dashboard
 jupyterlab>=4.0.0          # For strategy development
 schedule>=1.2.0            # For scheduled runs
-volprofile>=0.1.0          # Volume profile analysis
-candlestick-patterns-subodh101>=1.0.0  # Candlestick pattern recognition
+#volprofile>=0.1.0          # Volume profile analysis
+#candlestick-patterns-subodh101>=1.0.0  # Candlestick pattern recognition

@@ -78,7 +78,7 @@ async def main_async():
     config = load_config()
 
     # Setup logging
-    logger = setup_logger(config.log_level)
+    logger = setup_logger(config.log_level, use_json=config.use_json_logs)
     logger.info("Starting async trading bot...")
 
     # Validate data source for live trading

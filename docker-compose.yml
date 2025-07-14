@@ -1,0 +1,74 @@
+services:
+  app:
+    build: .
+    command: ["python", "main.py"]
+    env_file:
+      - .env
+    environment:
+      SYMBOLS: ${SYMBOLS}
+      # Core trading bot settings
+      DATA_SOURCE: ${DATA_SOURCE}
+      USE_SANDBOX: ${USE_SANDBOX}
+      STRATEGY_NAME: ${STRATEGY_NAME}
+      INITIAL_CAPITAL: ${INITIAL_CAPITAL}
+      
+      # CCXT Exchange settings
+      EXCHANGE_API_KEY: ${EXCHANGE_API_KEY}
+      EXCHANGE_API_SECRET: ${EXCHANGE_API_SECRET}
+      
+      # IBKR Connection settings
+      IBKR_HOST: ${IBKR_HOST}
+      IBKR_PORT: ${IBKR_PORT}
+      IBKR_CLIENT_ID: ${IBKR_CLIENT_ID}
+      
+      # IBKR Account settings
+      IBKR_ACCOUNT_TYPE: ${IBKR_ACCOUNT_TYPE}
+      IBKR_ACCOUNT_ID: ${IBKR_ACCOUNT_ID}
+      
+      # IBKR Market data settings
+      IBKR_MARKET_DATA_TYPE: ${IBKR_MARKET_DATA_TYPE}
+      
+      # IBKR Connection management
+      IBKR_CONNECT_TIMEOUT: ${IBKR_CONNECT_TIMEOUT}
+      IBKR_READ_TIMEOUT: ${IBKR_READ_TIMEOUT}
+      IBKR_AUTO_RECONNECT: ${IBKR_AUTO_RECONNECT}
+      IBKR_MAX_RECONNECT_ATTEMPTS: ${IBKR_MAX_RECONNECT_ATTEMPTS}
+      IBKR_RECONNECT_DELAY: ${IBKR_RECONNECT_DELAY}
+      
+      # IBKR Rate limiting
+      IBKR_MAX_REQUESTS_PER_SECOND: ${IBKR_MAX_REQUESTS_PER_SECOND}
+      IBKR_HISTORICAL_DATA_TIMEOUT: ${IBKR_HISTORICAL_DATA_TIMEOUT}
+      
+      # IBKR Logging
+      IBKR_LOG_LEVEL: ${IBKR_LOG_LEVEL}
+      
+      # Logging configuration
+      USE_JSON_LOGS: ${USE_JSON_LOGS}
+      
+      # Default timeframe
+      TIMEFRAME: ${TIMEFRAME}
+
+  db:
+    image: postgres:latest
+    volumes:
+      - trading-bot-postgres:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pguser
+      POSTGRES_DB: pgdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d pgdb -U pguser"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+volumes:
+  trading-bot-postgres: {}
