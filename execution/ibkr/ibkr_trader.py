@@ -42,6 +42,7 @@ class Order:
     status: OrderStatus
     timestamp: str
     ibkr_order_id: Optional[int] = None
+    ibkr_order: Optional[Any] = None  # Store the actual IBKR order object
     filled_size: float = 0.0
     average_price: float = 0.0
     error: Optional[str] = None
@@ -200,6 +201,7 @@ class IBKRTrader:
             
             if trade and hasattr(trade, 'order') and hasattr(trade.order, 'orderId'):
                 order.ibkr_order_id = trade.order.orderId
+                order.ibkr_order = trade.order  # Store the actual IBKR order object
                 order.status = OrderStatus.PLACED
                 
                 # Store order
@@ -284,6 +286,7 @@ class IBKRTrader:
             
             if trade and hasattr(trade, 'order') and hasattr(trade.order, 'orderId'):
                 order.ibkr_order_id = trade.order.orderId
+                order.ibkr_order = trade.order  # Store the actual IBKR order object
                 order.status = OrderStatus.PLACED
                 
                 # Store order
@@ -317,12 +320,12 @@ class IBKRTrader:
             
             order = self.orders[order_id]
             
-            if order.ibkr_order_id is None:
-                self.logger.error(f"No IBKR order ID for order {order_id}")
+            if order.ibkr_order is None:
+                self.logger.error(f"No IBKR order object for order {order_id}")
                 return False
             
-            # Cancel with IBKR
-            self.connection_manager.ib.cancelOrder(order.ibkr_order_id)
+            # Cancel with IBKR - use the actual order object
+            self.connection_manager.ib.cancelOrder(order.ibkr_order)
             
             # Update local status
             order.status = OrderStatus.CANCELLED
@@ -475,6 +478,8 @@ class IBKRTrader:
             for order_id, order_dict in orders_data.items():
                 # Convert dict back to Order object
                 order_dict['status'] = OrderStatus(order_dict['status'])
+                # Remove non-serializable fields that can't be recovered
+                order_dict.pop('ibkr_order', None)
                 self.orders[order_id] = Order(**order_dict)
             
             self.logger.info(f"Recovered {len(self.orders)} orders")
@@ -514,6 +519,8 @@ class IBKRTrader:
             for order_id, order in self.orders.items():
                 order_dict = asdict(order)
                 order_dict['status'] = order.status.value
+                # Remove non-serializable fields
+                order_dict.pop('ibkr_order', None)
                 orders_data[order_id] = order_dict
             
             self.state_store.save_orders(orders_data)

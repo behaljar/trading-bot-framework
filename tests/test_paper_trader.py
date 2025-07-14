@@ -5,7 +5,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import Mock, MagicMock
 
-from config.settings import Config
+from config.settings import TradingConfig
 from execution.paper import (
     VirtualPortfolio, VirtualPosition, VirtualOrder,
     OrderSimulator, PaperTrader, PerformanceTracker

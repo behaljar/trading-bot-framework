@@ -54,48 +54,41 @@ class IBKRConfig:
     @staticmethod
     def _clean_env_value(value: str) -> Optional[str]:
         """Clean environment variable value by removing inline comments"""
-        if not value:
-            return None
-        
-        # Remove inline comments (everything after #)
-        cleaned = value.split('#')[0].strip()
-        
-        # Return None if empty or just whitespace
-        if not cleaned or cleaned.isspace():
-            return None
-            
-        return cleaned
+        # Import here to avoid circular import issues
+        from utils.env_utils import clean_env_value
+        return clean_env_value(value)
     
     @classmethod
     def from_env(cls) -> 'IBKRConfig':
         """Create configuration from environment variables"""
         
         # Determine account type and set default port
-        account_type_str = os.getenv('IBKR_ACCOUNT_TYPE', 'paper').lower()
-        account_type = IBKRAccountType.PAPER if account_type_str == 'paper' else IBKRAccountType.LIVE
+        account_type_str = cls._clean_env_value(os.getenv('IBKR_ACCOUNT_TYPE', 'paper')) or 'paper'
+        account_type = IBKRAccountType.PAPER if account_type_str.lower() == 'paper' else IBKRAccountType.LIVE
         
         # Default ports based on account type
         default_port = 4002 if account_type == IBKRAccountType.PAPER else 7496
         
         # Market data type
-        market_data_type_int = int(os.getenv('IBKR_MARKET_DATA_TYPE', '3'))
+        market_data_type_str = cls._clean_env_value(os.getenv('IBKR_MARKET_DATA_TYPE', '3')) or '3'
+        market_data_type_int = int(market_data_type_str)
         market_data_type = IBKRMarketDataType(market_data_type_int)
         
         return cls(
-            host=os.getenv('IBKR_HOST', '127.0.0.1'),
-            port=int(os.getenv('IBKR_PORT', str(default_port))),
-            client_id=int(os.getenv('IBKR_CLIENT_ID', '1')),
+            host=cls._clean_env_value(os.getenv('IBKR_HOST', '127.0.0.1')) or '127.0.0.1',
+            port=int(cls._clean_env_value(os.getenv('IBKR_PORT', str(default_port))) or str(default_port)),
+            client_id=int(cls._clean_env_value(os.getenv('IBKR_CLIENT_ID', '1')) or '1'),
             account_type=account_type,
             account_id=cls._clean_env_value(os.getenv('IBKR_ACCOUNT_ID')),
             market_data_type=market_data_type,
-            connect_timeout=int(os.getenv('IBKR_CONNECT_TIMEOUT', '10')),
-            read_timeout=int(os.getenv('IBKR_READ_TIMEOUT', '30')),
-            auto_reconnect=os.getenv('IBKR_AUTO_RECONNECT', 'true').lower() == 'true',
-            max_reconnect_attempts=int(os.getenv('IBKR_MAX_RECONNECT_ATTEMPTS', '5')),
-            reconnect_delay=int(os.getenv('IBKR_RECONNECT_DELAY', '5')),
-            max_requests_per_second=int(os.getenv('IBKR_MAX_REQUESTS_PER_SECOND', '50')),
-            historical_data_timeout=int(os.getenv('IBKR_HISTORICAL_DATA_TIMEOUT', '60')),
-            log_level=os.getenv('IBKR_LOG_LEVEL', 'INFO')
+            connect_timeout=int(cls._clean_env_value(os.getenv('IBKR_CONNECT_TIMEOUT', '10')) or '10'),
+            read_timeout=int(cls._clean_env_value(os.getenv('IBKR_READ_TIMEOUT', '30')) or '30'),
+            auto_reconnect=(cls._clean_env_value(os.getenv('IBKR_AUTO_RECONNECT', 'true')) or 'true').lower() == 'true',
+            max_reconnect_attempts=int(cls._clean_env_value(os.getenv('IBKR_MAX_RECONNECT_ATTEMPTS', '5')) or '5'),
+            reconnect_delay=int(cls._clean_env_value(os.getenv('IBKR_RECONNECT_DELAY', '5')) or '5'),
+            max_requests_per_second=int(cls._clean_env_value(os.getenv('IBKR_MAX_REQUESTS_PER_SECOND', '50')) or '50'),
+            historical_data_timeout=int(cls._clean_env_value(os.getenv('IBKR_HISTORICAL_DATA_TIMEOUT', '60')) or '60'),
+            log_level=cls._clean_env_value(os.getenv('IBKR_LOG_LEVEL', 'INFO')) or 'INFO'
         )
     
     @property

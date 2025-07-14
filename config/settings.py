@@ -12,11 +12,10 @@ load_dotenv(override=True)
 
 def get_env_value(key: str, default: str = "") -> str:
     """Get environment variable value, stripping inline comments"""
+    from utils.env_utils import clean_env_value
     value = os.getenv(key, default)
-    if isinstance(value, str) and '#' in value:
-        # Strip inline comments - everything after the first #
-        value = value.split('#')[0].strip()
-    return value
+    cleaned = clean_env_value(value)
+    return cleaned if cleaned is not None else default
 
 @dataclass
 class TradingConfig:
