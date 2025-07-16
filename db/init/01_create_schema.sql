@@ -111,6 +111,29 @@ CREATE TABLE IF NOT EXISTS market_data (
     UNIQUE(symbol, exchange, timestamp, timeframe)
 );
 
+-- State persistence tables
+CREATE TABLE IF NOT EXISTS trading_state (
+    id SERIAL PRIMARY KEY,
+    instance_id VARCHAR(255) NOT NULL,
+    exchange VARCHAR(50) NOT NULL,
+    state_type VARCHAR(50) NOT NULL,  -- 'positions', 'orders', 'daily_pnl', 'checkpoint'
+    state_key VARCHAR(255),  -- For keyed state like positions[symbol], orders[id]
+    state_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(instance_id, exchange, state_type, state_key)
+);
+
+-- Trading locks table
+CREATE TABLE IF NOT EXISTS trading_locks (
+    id SERIAL PRIMARY KEY,
+    lock_id VARCHAR(255) UNIQUE NOT NULL,
+    instance_id VARCHAR(255) NOT NULL,
+    exchange VARCHAR(50) NOT NULL,
+    acquired_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '1 hour'
+);
+
 
 -- Create indexes
 CREATE INDEX idx_trades_symbol ON trades(symbol);
@@ -128,6 +151,13 @@ CREATE INDEX idx_signals_strategy ON strategy_signals(strategy_name);
 
 CREATE INDEX idx_market_data_lookup ON market_data(symbol, exchange, timeframe, timestamp DESC);
 
+-- State persistence indexes
+CREATE INDEX idx_trading_state_instance ON trading_state(instance_id, exchange, state_type);
+CREATE INDEX idx_trading_state_updated ON trading_state(updated_at);
+
+CREATE INDEX idx_trading_locks_instance ON trading_locks(instance_id, exchange);
+CREATE INDEX idx_trading_locks_expires ON trading_locks(expires_at);
+
 -- Create triggers for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -144,6 +174,9 @@ CREATE TRIGGER update_positions_updated_at BEFORE UPDATE ON positions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_balances_updated_at BEFORE UPDATE ON account_balances
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_trading_state_updated_at BEFORE UPDATE ON trading_state
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Create views for reporting

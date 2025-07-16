@@ -65,6 +65,8 @@ class TradingConfig:
     data_lookback_days: int = int(get_env_value("DATA_LOOKBACK_DAYS", "30"))
 
     def __post_init__(self) -> None:
+        # Configuration setup
+        
         # Load symbols from environment variable (comma-separated)
         if self.symbols is None:
             symbols_env = get_env_value("SYMBOLS", "")

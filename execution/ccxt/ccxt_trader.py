@@ -12,11 +12,13 @@ from dataclasses import dataclass, asdict
 
 from .state_persistence import StateStore
 from .file_state_store import FileStateStore
+from utils.hybrid_state_store import HybridStateStore
 from .position_sync import PositionSynchronizer
 from .data_manager import DataManager
 from risk.position_calculator import PositionCalculator
 from utils.latency_monitor import measure_api_latency
 from utils.sync_db_logger import get_sync_db_logger
+from utils.logger import get_logger
 
 
 class OrderStatus(Enum):
@@ -48,10 +50,27 @@ class CCXTTrader:
     
     def __init__(self, config):
         self.config = config
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger("TradingBot.ccxt_trader")
         
-        # State management - easily switchable to PostgreSQL later
-        self.state_store: StateStore = FileStateStore()
+        # State management - PostgreSQL with file fallback
+        self.logger.info(
+            "Initializing state store...",
+            extra={
+                'exchange': self.config.exchange_name.upper(),
+                'initial_capital': self.config.initial_capital
+            }
+        )
+        self.state_store = HybridStateStore(exchange=self.config.exchange_name.upper())
+        
+        # Log state store info
+        storage_info = self.state_store.get_storage_info()
+        self.logger.info(
+            "State store initialized",
+            extra={
+                'storage_info': storage_info,
+                'exchange': self.config.exchange_name.upper()
+            }
+        )
         
         # Safety settings (need these before _initialize_exchange)
         self.emergency_stop = False
@@ -74,15 +93,37 @@ class CCXTTrader:
         
         # Database logger
         try:
+            self.logger.info(
+                "Initializing database logger...",
+                extra={
+                    'exchange': self.config.exchange_name,
+                    'use_sandbox': self.config.use_sandbox
+                }
+            )
             self.db_logger = get_sync_db_logger()
             self.db_logging_enabled = True
+            self.logger.info(
+                "Database logging enabled",
+                extra={
+                    'db_logger_type': type(self.db_logger).__name__,
+                    'exchange': self.config.exchange_name
+                }
+            )
         except Exception as e:
-            self.logger.warning(f"Database logging disabled: {e}")
+            self.logger.warning(
+                "Database logging disabled",
+                extra={
+                    'error': str(e),
+                    'error_type': type(e).__name__,
+                    'exchange': self.config.exchange_name
+                }
+            )
             self.db_logger = None
             self.db_logging_enabled = False
         
         # Try to acquire lock
-        lock_id = f"trader_{config.exchange_name}_{datetime.now().isoformat()}"
+        # Use date-based lock ID to allow same-day restarts but prevent parallel executions
+        lock_id = f"trader_{config.exchange_name}_{config.timeframe}_{date.today().isoformat()}"
         if not self.state_store.acquire_lock(lock_id):
             raise RuntimeError("Another instance is already running!")
         self.lock_id = lock_id
@@ -118,6 +159,18 @@ class CCXTTrader:
             try:
                 exchange_class = getattr(ccxt, self.config.exchange_name)
                 
+                # Connection info (no sensitive data)
+                self.logger.info(
+                    "Initializing exchange connection",
+                    extra={
+                        'exchange': self.config.exchange_name,
+                        'sandbox_mode': self.config.use_sandbox,
+                        'trading_type': getattr(self.config, 'trading_type', 'spot'),
+                        'api_key_provided': bool(self.config.api_key and self.config.api_key != ''),
+                        'api_secret_provided': bool(self.config.api_secret and self.config.api_secret != '')
+                    }
+                )
+                
                 # Exchange configuration
                 exchange_config = {
                     'enableRateLimit': True,
@@ -137,11 +190,24 @@ class CCXTTrader:
                 # Enable sandbox mode if configured
                 if self.config.use_sandbox:
                     exchange_config['sandbox'] = True
+                    # For Binance futures testnet, we need to set the correct URLs
+                    if self.config.exchange_name == 'binance' and self.config.trading_type == 'future':
+                        exchange_config['urls'] = {
+                            'api': {
+                                'public': 'https://testnet.binancefuture.com/fapi/v1',
+                                'private': 'https://testnet.binancefuture.com/fapi/v1'
+                            },
+                            'test': {
+                                'public': 'https://testnet.binancefuture.com/fapi/v1',
+                                'private': 'https://testnet.binancefuture.com/fapi/v1'
+                            }
+                        }
                     
                 self.exchange = exchange_class(exchange_config)
                 
                 # Test connection and load markets
                 self.markets = self.exchange.load_markets()
+                
                 self.logger.info(
                     f"Exchange initialized: {self.config.exchange_name} "
                     f"{'SANDBOX' if self.config.use_sandbox else 'LIVE'} mode, "
@@ -166,12 +232,40 @@ class CCXTTrader:
             if self.config.api_key:
                 account_info = self.position_sync.get_account_info()
                 self.initial_balance = account_info.get('total_balance_usdt', self.config.initial_capital)
-                self.logger.info(f"Account balance: {self.initial_balance} USDT")
+                self.logger.info(
+                    "Account balance retrieved",
+                    extra={
+                        'initial_balance_usdt': self.initial_balance,
+                        'balance_source': 'exchange_api'
+                    }
+                )
+                
+                # Log initial balance to database
+                self.logger.info(
+                    "Updating initial account balance in database...",
+                    extra={
+                        'initial_balance': self.initial_balance,
+                        'db_logging_enabled': self.db_logging_enabled
+                    }
+                )
+                self._update_account_balance_db()
             else:
                 self.initial_balance = self.config.initial_capital
-                self.logger.info(f"No API key provided, using config capital: {self.initial_balance}")
+                self.logger.info(
+                    "Using config capital",
+                    extra={
+                        'initial_balance_usdt': self.initial_balance,
+                        'balance_source': 'config'
+                    }
+                )
         except Exception as e:
-            self.logger.warning(f"Could not get initial balance: {e}")
+            self.logger.warning(
+                "Could not get initial balance from exchange",
+                extra={
+                    'error': str(e),
+                    'fallback_balance': self.config.initial_capital
+                }
+            )
             self.initial_balance = self.config.initial_capital
                     
     def _recover_state(self):
@@ -239,6 +333,8 @@ class CCXTTrader:
             # Generate signals
             signals = strategy.generate_signals(df)
             latest_signal = signals.iloc[-1]
+
+            self.logger.info("Latest signal", extra={'signal': latest_signal})
             
             # Get current market state
             ticker = self._fetch_ticker_with_retry(symbol)
@@ -247,17 +343,62 @@ class CCXTTrader:
                 
             current_price = ticker['last']
             
+            # Log current price with structured data
+            self.logger.info(
+                "Current market price",
+                extra={
+                    'symbol': symbol,
+                    'current_price': current_price,
+                    'bid': ticker.get('bid'),
+                    'ask': ticker.get('ask'),
+                    'volume': ticker.get('baseVolume'),
+                    'timestamp': ticker.get('timestamp')
+                }
+            )
+            
             # Get or sync position
             current_position = self._get_or_sync_position(symbol)
+            
+            # Debug log the current position
+            self.logger.debug(
+                "Current position retrieved",
+                extra={
+                    'symbol': symbol,
+                    'current_position': current_position
+                }
+            )
             
             # Determine action
             action = self._determine_action(
                 current_position, latest_signal, current_price, strategy
             )
             
+            # Debug log the action decision
+            self.logger.debug(
+                "Action determined",
+                extra={
+                    'symbol': symbol,
+                    'action': action,
+                    'will_execute': action['type'] != 'hold'
+                }
+            )
+            
             # Execute if needed
             if action['type'] != 'hold':
+                self.logger.debug(
+                    "Executing action",
+                    extra={
+                        'symbol': symbol,
+                        'action': action,
+                        'current_price': current_price
+                    }
+                )
                 self._execute_action_safe(symbol, action, current_price)
+            else:
+                self.logger.debug(
+                    "Holding position, no action to execute",
+                    extra={'symbol': symbol}
+                )
                 
             # Save state after each cycle
             self._save_current_state()
@@ -329,46 +470,102 @@ class CCXTTrader:
         position_size = position.get('size', 0)
         strategy_name = strategy.get_strategy_name()
         
-        # Special handling for test strategy - alternating buy/sell
-        if strategy_name == "TestStrategy":
-            if position_size == 0 or position_size < 0.0001:
-                # No position - BUY
-                if signal > 0:
-                    size = self._calculate_position_size(current_price, strategy)
-                    self.logger.info(f"TEST: Opening position, size={size}")
-                    return {'type': 'open_long', 'size': size}
-            else:
-                # Have position - SELL (close it)
-                self.logger.info(f"TEST: Closing position, size={position_size}")
-                return {'type': 'close_long', 'size': -position_size}
-                
-            return {'type': 'hold', 'size': 0}
+        # Debug logging at the start
+        self.logger.debug(
+            "Determining action",
+            extra={
+                'strategy_name': strategy_name,
+                'position_size': position_size,
+                'signal': signal,
+                'current_price': current_price,
+                'position_dict': position
+            }
+        )
         
         # Normal strategy logic
+        self.logger.debug(
+            "Processing normal strategy logic",
+            extra={
+                'position_size': position_size,
+                'signal': signal,
+                'allow_short': getattr(self.config, 'allow_short', False)
+            }
+        )
+        
         # No position
         if position_size == 0 or position_size < 0.0001:
+            self.logger.debug("No position, checking for entry signals")
             if signal > 0:
                 size = self._calculate_position_size(current_price, strategy)
-                return {'type': 'open_long', 'size': size}
+                action = {'type': 'open_long', 'size': size}
+                self.logger.debug(
+                    "Normal strategy action: opening long position",
+                    extra={'action': action}
+                )
+                return action
             elif signal < 0 and self.config.allow_short:  # Only if shorting is allowed
                 size = self._calculate_position_size(current_price, strategy)
-                return {'type': 'open_short', 'size': -size}
+                action = {'type': 'open_short', 'size': -size}
+                self.logger.debug(
+                    "Normal strategy action: opening short position",
+                    extra={'action': action}
+                )
+                return action
+            else:
+                self.logger.debug(
+                    "No entry signal or shorting not allowed",
+                    extra={
+                        'signal': signal,
+                        'allow_short': getattr(self.config, 'allow_short', False)
+                    }
+                )
                 
         # Long position
         elif position_size > 0:
+            self.logger.debug("Have long position, checking for exit signals")
             if signal <= 0:  # Exit signal
-                return {'type': 'close_long', 'size': -position_size}
+                action = {'type': 'close_long', 'size': -position_size}
+                self.logger.debug(
+                    "Normal strategy action: closing long position (exit signal)",
+                    extra={'action': action}
+                )
+                return action
             elif self._should_stop_loss(position, current_price):
-                return {'type': 'stop_loss', 'size': -position_size}
+                action = {'type': 'stop_loss', 'size': -position_size}
+                self.logger.debug(
+                    "Normal strategy action: stop loss triggered",
+                    extra={'action': action}
+                )
+                return action
+            else:
+                self.logger.debug("Long position held, no exit signal")
                 
         # Short position
         elif position_size < 0:
+            self.logger.debug("Have short position, checking for exit signals")
             if signal >= 0:  # Exit signal
-                return {'type': 'close_short', 'size': -position_size}
+                action = {'type': 'close_short', 'size': -position_size}
+                self.logger.debug(
+                    "Normal strategy action: closing short position (exit signal)",
+                    extra={'action': action}
+                )
+                return action
             elif self._should_stop_loss(position, current_price):
-                return {'type': 'stop_loss', 'size': -position_size}
+                action = {'type': 'stop_loss', 'size': -position_size}
+                self.logger.debug(
+                    "Normal strategy action: short stop loss triggered",
+                    extra={'action': action}
+                )
+                return action
+            else:
+                self.logger.debug("Short position held, no exit signal")
                 
-        return {'type': 'hold', 'size': 0}
+        final_action = {'type': 'hold', 'size': 0}
+        self.logger.debug(
+            "Final action: holding",
+            extra={'action': final_action}
+        )
+        return final_action
         
     def _calculate_position_size(self, current_price: float, strategy, stop_loss: float = None) -> float:
         """Calculate position size based on risk management rules"""
@@ -494,6 +691,9 @@ class CCXTTrader:
                                     'filled_order': filled_order
                                 }
                             )
+                            
+                            # Update account balance after trade
+                            self._update_account_balance_db()
                         except Exception as e:
                             self.logger.warning(f"Failed to update trade in database: {e}")
                     
@@ -667,6 +867,16 @@ class CCXTTrader:
     def _save_current_state(self):
         """Save current state to disk"""
         try:
+            self.logger.debug(
+                "Saving current state...",
+                extra={
+                    'positions_count': len(self.positions),
+                    'orders_count': len(self.orders),
+                    'daily_pnl': self.daily_pnl,
+                    'storage_backend': self.state_store.get_storage_info().get('primary_store')
+                }
+            )
+            
             self.state_store.save_positions(self.positions)
             self.state_store.save_orders(self.orders)
             self.state_store.save_daily_pnl(date.today().isoformat(), self.daily_pnl)
@@ -681,14 +891,97 @@ class CCXTTrader:
             }
             self.state_store.save_checkpoint(checkpoint)
             
+            self.logger.debug(
+                "State saved successfully",
+                extra={
+                    'storage_backend': self.state_store.get_storage_info().get('primary_store')
+                }
+            )
+            
         except Exception as e:
-            self.logger.error(f"Failed to save state: {e}")
+            self.logger.error(
+                "Failed to save state",
+                extra={
+                    'error': str(e),
+                    'error_type': type(e).__name__,
+                    'storage_backend': self.state_store.get_storage_info().get('primary_store')
+                }
+            )
             
     def _get_cache_duration(self) -> int:
         """Get appropriate cache duration based on timeframe"""
         # Convert timeframe to seconds and use half of it for cache
         timeframe_seconds = self.data_manager.get_timeframe_seconds(self.config.timeframe)
         return max(60, timeframe_seconds // 2)  # At least 60 seconds
+        
+    def _update_account_balance_db(self):
+        """Update account balance in database"""
+        if not self.db_logging_enabled:
+            self.logger.debug(
+                "Database logging disabled, skipping balance update",
+                extra={'db_logging_enabled': self.db_logging_enabled}
+            )
+            return
+            
+        try:
+            # Get current account info
+            account_info = self.position_sync.get_account_info()
+            self.logger.debug(
+                "Retrieved account info for balance update",
+                extra={
+                    'account_info_keys': list(account_info.keys()),
+                    'balances_count': len(account_info.get('balances', {}))
+                }
+            )
+            
+            # Update USDT balance (primary trading currency)
+            usdt_balance = account_info.get('balances', {}).get('USDT', {})
+            if usdt_balance:
+                self.logger.debug(
+                    "Updating USDT balance in database",
+                    extra={
+                        'usdt_free': usdt_balance.get('free', 0),
+                        'usdt_used': usdt_balance.get('used', 0),
+                        'usdt_total': usdt_balance.get('total', 0)
+                    }
+                )
+                self.db_logger.update_balance(
+                    account_id=self.config.exchange_name,
+                    asset='USDT',
+                    free_balance=usdt_balance.get('free', 0),
+                    locked_balance=usdt_balance.get('used', 0),
+                    exchange=self.config.exchange_name
+                )
+            
+            # Update other significant balances
+            for asset, balance in account_info.get('balances', {}).items():
+                if asset != 'USDT' and balance.get('total', 0) > 0.001:  # Only log non-zero balances
+                    self.logger.debug(
+                        "Updating non-USDT balance in database",
+                        extra={
+                            'asset': asset,
+                            'free': balance.get('free', 0),
+                            'used': balance.get('used', 0),
+                            'total': balance.get('total', 0)
+                        }
+                    )
+                    self.db_logger.update_balance(
+                        account_id=self.config.exchange_name,
+                        asset=asset,
+                        free_balance=balance.get('free', 0),
+                        locked_balance=balance.get('used', 0),
+                        exchange=self.config.exchange_name
+                    )
+                    
+        except Exception as e:
+            self.logger.error(
+                "Failed to update account balance in database",
+                extra={
+                    'error': str(e),
+                    'error_type': type(e).__name__,
+                    'db_logging_enabled': self.db_logging_enabled
+                }
+            )
         
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get current performance summary"""

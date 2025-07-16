@@ -105,7 +105,17 @@ def main() -> None:
             # Get performance summary
             performance = trader.get_performance_summary()
             logger.info(
-                f"Performance: Daily P&L={performance.get('daily_pnl', 0):.2f}, Open Positions={performance.get('open_positions', 0)}")
+                "Performance summary",
+                extra={
+                    'daily_pnl': performance.get('daily_pnl', 0),
+                    'open_positions': performance.get('open_positions', 0),
+                    'initial_balance': performance.get('initial_balance', 0),
+                    'current_balance': performance.get('current_balance', 0),
+                    'total_pnl': performance.get('total_pnl', 0),
+                    'emergency_stop': performance.get('emergency_stop', False),
+                    'trading_mode': performance.get('mode', 'UNKNOWN')
+                }
+            )
 
             # Calculate sleep time until next candle
             if hasattr(trader, 'data_manager'):
@@ -136,9 +146,19 @@ def main() -> None:
                 trader.shutdown()
             # Final performance summary
             performance = trader.get_performance_summary()
-            logger.info("=== FINAL PERFORMANCE SUMMARY ===")
-            for key, value in performance.items():
-                logger.info(f"{key}: {value}")
+            logger.info(
+                "Final performance summary",
+                extra={
+                    'final_summary': True,
+                    'daily_pnl': performance.get('daily_pnl', 0),
+                    'open_positions': performance.get('open_positions', 0),
+                    'initial_balance': performance.get('initial_balance', 0),
+                    'current_balance': performance.get('current_balance', 0),
+                    'total_pnl': performance.get('total_pnl', 0),
+                    'emergency_stop': performance.get('emergency_stop', False),
+                    'trading_mode': performance.get('mode', 'UNKNOWN')
+                }
+            )
             break
         except Exception as e:
             logger.error(f"Unexpected error in main loop: {e}", exc_info=True)

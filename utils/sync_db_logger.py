@@ -231,7 +231,29 @@ def get_sync_db_logger() -> SyncDatabaseLogger:
     """Get or create the sync database logger instance."""
     global _sync_db_logger
     if _sync_db_logger is None:
-        _sync_db_logger = SyncDatabaseLogger()
-        # Initialize on first use
-        _sync_db_logger.initialize()
+        try:
+            logger.info(
+                "Creating sync database logger instance...",
+                extra={'instance_exists': _sync_db_logger is not None}
+            )
+            _sync_db_logger = SyncDatabaseLogger()
+            # Initialize on first use
+            logger.info(
+                "Initializing sync database logger...",
+                extra={'logger_created': True}
+            )
+            _sync_db_logger.initialize()
+            logger.info(
+                "Sync database logger initialized successfully",
+                extra={'initialization_complete': True}
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to initialize sync database logger",
+                extra={
+                    'error': str(e),
+                    'error_type': type(e).__name__
+                }
+            )
+            raise
     return _sync_db_logger

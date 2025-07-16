@@ -17,8 +17,10 @@ except ImportError:
     raise ImportError("ib_async is required. Install with: pip install ib_async>=0.9.86")
 
 from .ibkr_state_store import IBKRStateStore
+from utils.hybrid_state_store import HybridStateStore
 from .ibkr_position_sync import IBKRPositionSync
 from utils.latency_monitor import measure_api_latency
+from utils.sync_db_logger import get_sync_db_logger
 from data.ibkr_connection import IBKRConnectionManager
 from config.ibkr_config import IBKRConfig, create_ibkr_config
 from risk.position_calculator import PositionCalculator
@@ -57,8 +59,8 @@ class IBKRTrader:
         self.ibkr_config = ibkr_config or create_ibkr_config()
         self.logger = logging.getLogger(__name__)
         
-        # State management
-        self.state_store = IBKRStateStore()
+        # State management - PostgreSQL with file fallback
+        self.state_store = HybridStateStore(exchange='IBKR')
         
         # Safety settings
         self.emergency_stop = False
@@ -82,8 +84,18 @@ class IBKRTrader:
             max_position_pct=getattr(config, 'max_position_size', 0.1)
         )
         
+        # Database logger
+        try:
+            self.db_logger = get_sync_db_logger()
+            self.db_logging_enabled = True
+        except Exception as e:
+            self.logger.warning(f"Database logging disabled: {e}")
+            self.db_logger = None
+            self.db_logging_enabled = False
+        
         # Try to acquire lock
-        lock_id = f"ibkr_trader_{self.ibkr_config.account_type.value}_{datetime.now().isoformat()}"
+        # Use date-based lock ID to allow same-day restarts but prevent parallel executions
+        lock_id = f"ibkr_trader_{self.ibkr_config.account_type.value}_{date.today().isoformat()}"
         if not self.state_store.acquire_lock(lock_id):
             raise RuntimeError("Another IBKR trader instance is already running!")
         self.lock_id = lock_id
@@ -117,6 +129,18 @@ class IBKRTrader:
         """Initialize the trader and connect to IBKR"""
         try:
             # Connect to IBKR
+            self.logger.info(
+                "Initializing IBKR connection",
+                extra={
+                    'exchange': 'IBKR',
+                    'account_type': self.ibkr_config.account_type.value,
+                    'is_paper_trading': self.ibkr_config.is_paper_trading,
+                    'host': self.ibkr_config.host,
+                    'port': self.ibkr_config.port,
+                    'client_id': self.ibkr_config.client_id
+                }
+            )
+            
             if not await self.connection_manager.connect():
                 self.logger.error("Failed to connect to IBKR")
                 return False
@@ -220,6 +244,27 @@ class IBKRTrader:
                 # Store order
                 self.orders[order_id] = order
                 self._save_orders()
+                
+                # Log to database
+                if self.db_logging_enabled:
+                    try:
+                        self.db_logger.log_trade(
+                            trade_id=str(order.ibkr_order_id),
+                            symbol=symbol,
+                            side=side,
+                            quantity=size,
+                            price=0.0,  # Will be updated when filled
+                            status='placed',
+                            order_type='market',
+                            exchange='IBKR',
+                            metadata={
+                                'internal_order_id': order_id,
+                                'ibkr_order_id': order.ibkr_order_id,
+                                'account_type': self.ibkr_config.account_type.value
+                            }
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Failed to log trade to database: {e}")
                 
                 # Monitor order execution
                 await self._monitor_order_execution(order_id, trade)
@@ -419,6 +464,29 @@ class IBKRTrader:
                         order.filled_size = filled
                         order.average_price = avg_fill_price if avg_fill_price and avg_fill_price > 0 else 0.0
                         self.logger.info(f"Order {order_id} filled: {filled} @ {order.average_price}")
+                        
+                        # Update database with filled order
+                        if self.db_logging_enabled:
+                            try:
+                                self.db_logger.log_trade(
+                                    trade_id=str(order.ibkr_order_id),
+                                    symbol=order.symbol,
+                                    side=order.side,
+                                    quantity=order.filled_size,
+                                    price=order.average_price,
+                                    status='filled',
+                                    order_type=order.order_type,
+                                    exchange='IBKR',
+                                    executed_at=datetime.now(),
+                                    metadata={
+                                        'internal_order_id': order_id,
+                                        'ibkr_order_id': order.ibkr_order_id,
+                                        'account_type': self.ibkr_config.account_type.value
+                                    }
+                                )
+                            except Exception as e:
+                                self.logger.warning(f"Failed to update trade in database: {e}")
+                        
                         break
                     elif status == 'PartiallyFilled':
                         order.status = OrderStatus.PARTIAL
@@ -491,9 +559,24 @@ class IBKRTrader:
         try:
             balance_info = await self.get_account_balance()
             self.initial_balance = balance_info.get('net_liquidation', 0.0)
-            self.logger.info(f"Initial account balance: ${self.initial_balance:,.2f}")
+            self.logger.info(
+                "Account balance retrieved",
+                extra={
+                    'initial_balance_usd': self.initial_balance,
+                    'balance_source': 'ibkr_api',
+                    'total_cash': balance_info.get('total_cash', 0.0),
+                    'buying_power': balance_info.get('buying_power', 0.0),
+                    'unrealized_pnl': balance_info.get('unrealized_pnl', 0.0)
+                }
+            )
         except Exception as e:
-            self.logger.error(f"Error setting initial balance: {e}")
+            self.logger.error(
+                "Could not get initial balance from IBKR",
+                extra={
+                    'error': str(e),
+                    'fallback_balance': 0.0
+                }
+            )
             self.initial_balance = 0.0
     
     def _recover_state(self) -> None:
@@ -637,6 +720,18 @@ class IBKRTrader:
                 
                 # Get real current price from IBKR
                 current_price = self._get_current_price_simple(symbol)
+                
+                # Log current price with structured data
+                self.logger.info(
+                    "Current market price",
+                    extra={
+                        'symbol': symbol,
+                        'current_price': current_price,
+                        'exchange': 'IBKR',
+                        'position_size': position_size,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                )
                 
                 # Get historical data for signal generation
                 historical_data = self._get_historical_data_simple(symbol, strategy)
@@ -874,12 +969,22 @@ class IBKRTrader:
             # Get positions
             positions = self._run_async_method(self.get_positions)
             
+            # Get current balance
+            try:
+                balance_info = self._run_async_method(self.get_account_balance)
+                current_balance = balance_info.get('net_liquidation', self.initial_balance or 0.0)
+            except Exception as e:
+                self.logger.debug(f"Could not get current balance: {e}")
+                current_balance = self.initial_balance or 0.0
+            
             return {
                 'daily_pnl': self.daily_pnl,
                 'open_positions': len(positions),
-                'positions': positions,
+                'initial_balance': self.initial_balance or 0.0,
+                'current_balance': current_balance,
+                'total_pnl': current_balance - (self.initial_balance or 0.0) if self.initial_balance else 0.0,
                 'emergency_stop': self.emergency_stop,
-                'initial_balance': self.initial_balance or 0.0
+                'mode': 'PAPER' if self.ibkr_config.is_paper_trading else 'LIVE'
             }
             
         except Exception as e:

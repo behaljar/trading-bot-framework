@@ -17,12 +17,6 @@ class JSONFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno,
-            "thread": record.thread,
-            "thread_name": record.threadName,
-            "process": record.process,
         }
         
         # Add exception info if present
@@ -50,7 +44,20 @@ def get_logger(name: str = None) -> logging.Logger:
     """Get or create a logger with the given name"""
     if name is None:
         name = __name__
-    return logging.getLogger(name)
+    
+    logger = logging.getLogger(name)
+    
+    # If this is a child of TradingBot logger, ensure it inherits configuration
+    if name.startswith("TradingBot.") and not logger.handlers:
+        # Get the parent logger
+        parent_logger = logging.getLogger("TradingBot")
+        if parent_logger.handlers:
+            # Set the same level as parent
+            logger.setLevel(parent_logger.level)
+            # Enable propagation to parent (this is default but make it explicit)
+            logger.propagate = True
+    
+    return logger
 
 
 def setup_logger(log_level: str = "INFO", use_json: bool = True) -> logging.Logger:
