@@ -15,6 +15,8 @@ from .file_state_store import FileStateStore
 from .position_sync import PositionSynchronizer
 from .data_manager import DataManager
 from risk.position_calculator import PositionCalculator
+from utils.latency_monitor import measure_api_latency
+from utils.sync_db_logger import get_sync_db_logger
 
 
 class OrderStatus(Enum):
@@ -69,6 +71,15 @@ class CCXTTrader:
             risk_percentage=0.02,    # 2% risk per trade
             max_position_pct=config.max_position_size
         )
+        
+        # Database logger
+        try:
+            self.db_logger = get_sync_db_logger()
+            self.db_logging_enabled = True
+        except Exception as e:
+            self.logger.warning(f"Database logging disabled: {e}")
+            self.db_logger = None
+            self.db_logging_enabled = False
         
         # Try to acquire lock
         lock_id = f"trader_{config.exchange_name}_{datetime.now().isoformat()}"
@@ -275,6 +286,7 @@ class CCXTTrader:
                     self.logger.error(f"Failed to get data after {self.max_retries} attempts")
                     return None
                     
+    @measure_api_latency('ccxt_fetch_ticker', 'GET')
     def _fetch_ticker_with_retry(self, symbol: str) -> Optional[dict]:
         """Fetch ticker with retry logic"""
         for attempt in range(self.max_retries):
@@ -430,6 +442,27 @@ class CCXTTrader:
                 self.orders[order_id]['exchange_order_id'] = exchange_order['id']
                 self.orders[order_id]['status'] = OrderStatus.PLACED.value
                 
+                # Log to database
+                if self.db_logging_enabled:
+                    try:
+                        self.db_logger.log_trade(
+                            trade_id=exchange_order['id'],
+                            symbol=symbol,
+                            side=order.side,
+                            quantity=order.size,
+                            price=exchange_order.get('price', current_price),
+                            status='placed',
+                            order_type='market',
+                            exchange=self.config.exchange_name,
+                            metadata={
+                                'internal_order_id': order_id,
+                                'action': action,
+                                'current_price': current_price
+                            }
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Failed to log trade to database: {e}")
+                
                 # Wait for fill
                 filled_order = self._wait_for_fill(exchange_order['id'], symbol)
                 
@@ -439,6 +472,30 @@ class CCXTTrader:
                     self.orders[order_id]['status'] = OrderStatus.FILLED.value
                     self.orders[order_id]['filled_size'] = filled_order.get('filled', filled_order.get('amount'))
                     self.orders[order_id]['average_price'] = filled_order.get('average', filled_order.get('price'))
+                    
+                    # Update database with filled order
+                    if self.db_logging_enabled:
+                        try:
+                            self.db_logger.log_trade(
+                                trade_id=exchange_order['id'],
+                                symbol=symbol,
+                                side=order.side,
+                                quantity=filled_order.get('filled', order.size),
+                                price=filled_order.get('average', current_price),
+                                status='filled',
+                                order_type='market',
+                                exchange=self.config.exchange_name,
+                                commission=filled_order.get('fee', {}).get('cost', 0),
+                                commission_asset=filled_order.get('fee', {}).get('currency'),
+                                executed_at=datetime.now(),
+                                metadata={
+                                    'internal_order_id': order_id,
+                                    'action': action,
+                                    'filled_order': filled_order
+                                }
+                            )
+                        except Exception as e:
+                            self.logger.warning(f"Failed to update trade in database: {e}")
                     
                     self.logger.info(
                         f"Order filled: {action['type']} {symbol} "
@@ -476,6 +533,7 @@ class CCXTTrader:
             self.logger.error(f"Order validation failed: {e}")
             return False
             
+    @measure_api_latency('ccxt_place_order', 'POST')
     def _place_order_with_retry(self, symbol: str, size: float) -> Optional[dict]:
         """Place order with retry and error handling"""
         for attempt in range(self.max_retries):
@@ -510,6 +568,7 @@ class CCXTTrader:
                 else:
                     return None
                     
+    @measure_api_latency('ccxt_fetch_order', 'GET')
     def _wait_for_fill(self, order_id: str, symbol: str, timeout: int = 30) -> Optional[dict]:
         """Wait for order to fill with timeout"""
         start_time = time.time()
@@ -545,12 +604,29 @@ class CCXTTrader:
         
         if action_type in ['open_long', 'open_short']:
             # New position
+            position_size = filled_size if 'long' in action_type else -filled_size
             self.positions[symbol] = {
-                'size': filled_size if 'long' in action_type else -filled_size,
+                'size': position_size,
                 'entry_price': average_price,
                 'side': 'long' if 'long' in action_type else 'short',
                 'entry_time': datetime.now().isoformat()
             }
+            
+            # Log position to database
+            if self.db_logging_enabled:
+                try:
+                    self.db_logger.update_position(
+                        symbol=symbol,
+                        quantity=position_size,
+                        average_price=average_price,
+                        exchange=self.config.exchange_name,
+                        metadata={
+                            'action_type': action_type,
+                            'entry_time': datetime.now().isoformat()
+                        }
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to log position to database: {e}")
         else:
             # Closing position - calculate P&L
             if current_position.get('entry_price'):
@@ -568,6 +644,25 @@ class CCXTTrader:
                 
             # Clear position
             self.positions[symbol] = {'size': 0, 'entry_price': None}
+            
+            # Log position close to database
+            if self.db_logging_enabled:
+                try:
+                    self.db_logger.update_position(
+                        symbol=symbol,
+                        quantity=0,
+                        average_price=current_position.get('entry_price', average_price),
+                        exchange=self.config.exchange_name,
+                        realized_pnl=net_pnl if 'net_pnl' in locals() else 0,
+                        metadata={
+                            'action_type': action_type,
+                            'close_time': datetime.now().isoformat(),
+                            'close_price': average_price,
+                            'pnl': net_pnl if 'net_pnl' in locals() else 0
+                        }
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to log position close to database: {e}")
             
     def _save_current_state(self):
         """Save current state to disk"""

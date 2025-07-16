@@ -15,6 +15,7 @@ from strategies.test_strategy import TestStrategy
 from execution.ccxt import CCXTTrader
 from execution.ibkr import IBKRTrader
 from utils.logger import setup_logger
+from utils.metrics_server import start_metrics_server
 
 
 def main() -> None:
@@ -25,6 +26,11 @@ def main() -> None:
     # Setup logging
     logger = setup_logger(config.log_level, use_json=config.use_json_logs)
     logger.info("Starting trading bot...")
+    
+    # Start metrics server
+    metrics_server = start_metrics_server()
+    if metrics_server:
+        logger.info("Metrics server started on http://0.0.0.0:8000/metrics")
     
     # Global trader reference for signal handler
     trader = None

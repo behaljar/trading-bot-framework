@@ -46,6 +46,13 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data, default=str)
 
 
+def get_logger(name: str = None) -> logging.Logger:
+    """Get or create a logger with the given name"""
+    if name is None:
+        name = __name__
+    return logging.getLogger(name)
+
+
 def setup_logger(log_level: str = "INFO", use_json: bool = True) -> logging.Logger:
     """Sets up logging for trading bot"""
 

@@ -185,3 +185,56 @@ dev: sandbox
 # === ALIASES ===
 run: live
 paper: sandbox
+
+# === DOCKER SERVICES ===
+docker-up:
+	@echo "🚀 Starting Docker services (PostgreSQL, Prometheus, Grafana)..."
+	docker compose up -d postgres prometheus grafana adminer
+	@echo "✅ Services started:"
+	@echo "   - PostgreSQL: http://localhost:5432"
+	@echo "   - Adminer: http://localhost:8080"
+	@echo "   - Prometheus: http://localhost:9090"
+	@echo "   - Grafana: http://localhost:3000 (admin/admin)"
+
+docker-down:
+	@echo "🛑 Stopping Docker services..."
+	docker compose down
+	@echo "✅ Services stopped"
+
+docker-logs:
+	@echo "📋 Docker services logs..."
+	docker compose logs -f
+
+docker-ps:
+	@echo "📊 Docker services status..."
+	docker compose ps
+
+docker-clean:
+	@echo "🧹 Cleaning Docker volumes (WARNING: This will delete all data!)..."
+	@read -p "Are you sure you want to delete all Docker volumes? (yes/no): " confirm && [ "$$confirm" = "yes" ]
+	docker compose down -v
+	@echo "✅ Docker volumes cleaned"
+
+# Database management
+db-shell:
+	@echo "🐘 Connecting to PostgreSQL..."
+	docker compose exec postgres psql -U trading_user -d trading_bot
+
+db-migrate:
+	@echo "🔄 Running database migrations..."
+	docker compose exec -T postgres psql -U trading_user -d trading_bot < db/init/01_create_schema.sql
+	@echo "✅ Migrations completed"
+
+# Monitoring shortcuts
+grafana:
+	@echo "📊 Opening Grafana dashboard..."
+	@echo "Default credentials: admin/admin"
+	xdg-open http://localhost:3000 2>/dev/null || open http://localhost:3000 2>/dev/null || echo "Open http://localhost:3000 in your browser"
+
+prometheus:
+	@echo "📈 Opening Prometheus..."
+	xdg-open http://localhost:9090 2>/dev/null || open http://localhost:9090 2>/dev/null || echo "Open http://localhost:9090 in your browser"
+
+adminer:
+	@echo "🗄️ Opening Adminer (database admin)..."
+	xdg-open http://localhost:8080 2>/dev/null || open http://localhost:8080 2>/dev/null || echo "Open http://localhost:8080 in your browser"

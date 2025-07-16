@@ -18,6 +18,7 @@ except ImportError:
 
 from .ibkr_state_store import IBKRStateStore
 from .ibkr_position_sync import IBKRPositionSync
+from utils.latency_monitor import measure_api_latency
 from data.ibkr_connection import IBKRConnectionManager
 from config.ibkr_config import IBKRConfig, create_ibkr_config
 from risk.position_calculator import PositionCalculator
@@ -150,6 +151,7 @@ class IBKRTrader:
         except Exception as e:
             self.logger.error(f"Error during shutdown: {e}")
     
+    @measure_api_latency('ibkr_place_market_order', 'POST')
     async def place_market_order(self, symbol: str, side: str, size: float, 
                                 stop_loss: Optional[float] = None,
                                 take_profit: Optional[float] = None) -> Optional[Order]:
@@ -241,6 +243,7 @@ class IBKRTrader:
                 return order
             return None
     
+    @measure_api_latency('ibkr_place_limit_order', 'POST')
     async def place_limit_order(self, symbol: str, side: str, size: float, price: float,
                                stop_loss: Optional[float] = None,
                                take_profit: Optional[float] = None) -> Optional[Order]:
