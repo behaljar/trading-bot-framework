@@ -30,7 +30,7 @@ class TestStrategy(BaseStrategy):
         
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         """
-        Generate alternating signals for testing: 1 -> 0 -> -1 -> 0 -> 1 ...
+        Generate alternating signals for testing: 1 -> -1 -> 1 -> -1 ...
         
         Args:
             data: OHLCV DataFrame
@@ -42,31 +42,20 @@ class TestStrategy(BaseStrategy):
             self.logger.warning(f"Insufficient data: {len(data)} bars, need {self.min_bars_required}")
             return pd.Series([Signal.HOLD.value] * len(data), index=data.index)
             
-        # Create signals series
+        # Create signals series - all HOLD by default
         signals = pd.Series([Signal.HOLD.value] * len(data), index=data.index)
         
-        # For testing: cycle through signals every few bars
-        signal_frequency = 1  # Generate signal every 5 bars
-
-        for i in range(signal_frequency - 1, len(data), signal_frequency):
-            # Cycle through: BUY (1) -> HOLD (0) -> SELL (-1) -> HOLD (0) -> BUY (1)...
-            self._signal_counter += 1
-            
-            # Pattern: BUY, HOLD, SELL, HOLD, BUY, HOLD, SELL, HOLD...
-            cycle_position = self._signal_counter % 4
-            
-            if cycle_position == 1:  # First signal: BUY
-                signals.iloc[i] = Signal.BUY.value
-                self.last_signal = Signal.BUY.value
-            elif cycle_position == 2:  # Second signal: HOLD
-                signals.iloc[i] = Signal.HOLD.value
-                self.last_signal = Signal.HOLD.value
-            elif cycle_position == 3:  # Third signal: SELL
-                signals.iloc[i] = Signal.SELL.value
-                self.last_signal = Signal.SELL.value
-            else:  # Fourth signal (cycle_position == 0): HOLD
-                signals.iloc[i] = Signal.HOLD.value
-                self.last_signal = Signal.HOLD.value
+        # For testing: Generate signal only on the last bar (what trader actually uses)
+        # This ensures the latest signal is always actionable
+        self._signal_counter += 1
+        
+        # Simple alternating pattern: BUY -> SELL -> BUY -> SELL...
+        if self._signal_counter % 2 == 1:
+            signals.iloc[-1] = Signal.BUY.value
+            self.last_signal = Signal.BUY.value
+        else:
+            signals.iloc[-1] = Signal.SELL.value
+            self.last_signal = Signal.SELL.value
         
         return signals
         

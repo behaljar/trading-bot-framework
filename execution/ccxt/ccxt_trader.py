@@ -393,7 +393,7 @@ class CCXTTrader:
                         'current_price': current_price
                     }
                 )
-                self._execute_action_safe(symbol, action, current_price)
+                self._execute_action_safe(symbol, action, current_price, strategy)
             else:
                 self.logger.debug(
                     "Holding position, no action to execute",
@@ -610,7 +610,7 @@ class CCXTTrader:
             
         return loss_pct >= self.config.stop_loss_pct
         
-    def _execute_action_safe(self, symbol: str, action: dict, current_price: float):
+    def _execute_action_safe(self, symbol: str, action: dict, current_price: float, strategy):
         """Execute action with comprehensive error handling"""
         order_id = f"{symbol}_{action['type']}_{int(time.time())}"
         
@@ -648,8 +648,9 @@ class CCXTTrader:
                             side=order.side,
                             quantity=order.size,
                             price=exchange_order.get('price', current_price),
-                            status='placed',
+                            status='pending',
                             order_type='market',
+                            strategy_name=strategy.get_strategy_name(),
                             exchange=self.config.exchange_name,
                             metadata={
                                 'internal_order_id': order_id,
@@ -671,8 +672,13 @@ class CCXTTrader:
                     self.orders[order_id]['average_price'] = filled_order.get('average', filled_order.get('price'))
                     
                     # Update database with filled order
-                    if self.db_logging_enabled:
+                    if self.db_logging_enabled and filled_order is not None:
                         try:
+                            # Extract fee information safely
+                            fee_info = filled_order.get('fee', {}) or {}
+                            commission = fee_info.get('cost', 0) if fee_info else 0
+                            commission_asset = fee_info.get('currency') if fee_info else None
+                            
                             self.db_logger.log_trade(
                                 trade_id=exchange_order['id'],
                                 symbol=symbol,
@@ -681,9 +687,10 @@ class CCXTTrader:
                                 price=filled_order.get('average', current_price),
                                 status='filled',
                                 order_type='market',
+                                strategy_name=strategy.get_strategy_name(),
                                 exchange=self.config.exchange_name,
-                                commission=filled_order.get('fee', {}).get('cost', 0),
-                                commission_asset=filled_order.get('fee', {}).get('currency'),
+                                commission=commission,
+                                commission_asset=commission_asset,
                                 executed_at=datetime.now(),
                                 metadata={
                                     'internal_order_id': order_id,

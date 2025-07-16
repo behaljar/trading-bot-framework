@@ -178,7 +178,8 @@ class IBKRTrader:
     @measure_api_latency('ibkr_place_market_order', 'POST')
     async def place_market_order(self, symbol: str, side: str, size: float, 
                                 stop_loss: Optional[float] = None,
-                                take_profit: Optional[float] = None) -> Optional[Order]:
+                                take_profit: Optional[float] = None,
+                                strategy = None) -> Optional[Order]:
         """
         Place a market order
         
@@ -254,8 +255,9 @@ class IBKRTrader:
                             side=side,
                             quantity=size,
                             price=0.0,  # Will be updated when filled
-                            status='placed',
+                            status='pending',
                             order_type='market',
+                            strategy_name=strategy.get_strategy_name() if strategy else None,
                             exchange='IBKR',
                             metadata={
                                 'internal_order_id': order_id,
@@ -267,7 +269,7 @@ class IBKRTrader:
                         self.logger.warning(f"Failed to log trade to database: {e}")
                 
                 # Monitor order execution
-                await self._monitor_order_execution(order_id, trade)
+                await self._monitor_order_execution(order_id, trade, strategy)
                 
                 # Place bracket orders if specified
                 if stop_loss or take_profit:
@@ -353,7 +355,7 @@ class IBKRTrader:
                 self._save_orders()
                 
                 # Monitor order execution
-                await self._monitor_order_execution(order_id, trade)
+                await self._monitor_order_execution(order_id, trade, strategy)
                 
                 return order
             else:
@@ -439,7 +441,7 @@ class IBKRTrader:
             self.logger.error(f"Error getting account balance: {e}")
             return {}
     
-    async def _monitor_order_execution(self, order_id: str, trade) -> None:
+    async def _monitor_order_execution(self, order_id: str, trade, strategy=None) -> None:
         """Monitor order execution in the background"""
         try:
             order = self.orders[order_id]
@@ -476,6 +478,7 @@ class IBKRTrader:
                                     price=order.average_price,
                                     status='filled',
                                     order_type=order.order_type,
+                                    strategy_name=strategy.get_strategy_name() if strategy else None,
                                     exchange='IBKR',
                                     executed_at=datetime.now(),
                                     metadata={
@@ -750,10 +753,10 @@ class IBKRTrader:
                     # Log the action
                     if action == 'buy':
                         self.logger.info(f"BUY signal for {symbol} at ${current_price:.2f}")
-                        self._execute_buy_order(symbol, current_price)
+                        self._execute_buy_order(symbol, current_price, strategy)
                     elif action == 'sell':
                         self.logger.info(f"SELL signal for {symbol} at ${current_price:.2f}")
-                        self._execute_sell_order(symbol, current_price, abs(position_size))
+                        self._execute_sell_order(symbol, current_price, abs(position_size), strategy)
                     else:
                         self.logger.info(f"HOLD signal for {symbol} at ${current_price:.2f}")
                 else:
@@ -932,14 +935,14 @@ class IBKRTrader:
         else:
             return 'hold'
     
-    def _execute_buy_order(self, symbol: str, price: float):
+    def _execute_buy_order(self, symbol: str, price: float, strategy):
         """Execute a buy order"""
         try:
             # Calculate position size (simple approach)
             position_size = 1.0  # Default to 1 share for now
             
             # Place market order
-            order = self._run_async_method(self.place_market_order, symbol, 'buy', position_size)
+            order = self._run_async_method(self.place_market_order, symbol, 'buy', position_size, strategy=strategy)
             
             if order:
                 self.logger.info(f"Placed buy order for {symbol}: {order.id}")
@@ -949,11 +952,11 @@ class IBKRTrader:
         except Exception as e:
             self.logger.error(f"Error executing buy order for {symbol}: {e}")
     
-    def _execute_sell_order(self, symbol: str, price: float, size: float):
+    def _execute_sell_order(self, symbol: str, price: float, size: float, strategy):
         """Execute a sell order"""
         try:
             # Place market order to close position
-            order = self._run_async_method(self.place_market_order, symbol, 'sell', size)
+            order = self._run_async_method(self.place_market_order, symbol, 'sell', size, strategy=strategy)
             
             if order:
                 self.logger.info(f"Placed sell order for {symbol}: {order.id}")
