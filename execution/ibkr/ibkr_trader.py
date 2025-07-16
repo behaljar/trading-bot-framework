@@ -24,6 +24,7 @@ from utils.sync_db_logger import get_sync_db_logger
 from data.ibkr_connection import IBKRConnectionManager
 from config.ibkr_config import IBKRConfig, create_ibkr_config
 from risk.position_calculator import PositionCalculator
+from monitoring.alert_system import AlertSystem
 
 
 class OrderStatus(Enum):
@@ -83,6 +84,9 @@ class IBKRTrader:
             risk_percentage=0.02,    # 2% risk per trade
             max_position_pct=getattr(config, 'max_position_size', 0.1)
         )
+        
+        # Alert system
+        self.alert_system = AlertSystem(config) if config else None
         
         # Database logger
         try:

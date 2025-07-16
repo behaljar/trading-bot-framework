@@ -19,6 +19,7 @@ from risk.position_calculator import PositionCalculator
 from utils.latency_monitor import measure_api_latency
 from utils.sync_db_logger import get_sync_db_logger
 from utils.logger import get_logger
+from monitoring.alert_system import AlertSystem
 
 
 class OrderStatus(Enum):
@@ -90,6 +91,9 @@ class CCXTTrader:
             risk_percentage=0.02,    # 2% risk per trade
             max_position_pct=config.max_position_size
         )
+        
+        # Alert system
+        self.alert_system = AlertSystem(config)
         
         # Database logger
         try:
@@ -322,6 +326,8 @@ class CCXTTrader:
             if abs(self.daily_pnl) > self.daily_loss_limit:
                 self.logger.error(f"Daily loss limit reached: {self.daily_pnl}")
                 self.emergency_stop = True
+                alert_message = f"🚨 EMERGENCY STOP: Daily loss limit reached!\nDaily P&L: {self.daily_pnl:.2f} USDT\nLimit: {self.daily_loss_limit:.2f} USDT\nTrading halted."
+                self.alert_system.send_alert(alert_message, "error")
                 return
                 
             # Get data with retry
@@ -834,6 +840,11 @@ class CCXTTrader:
                     )
                 except Exception as e:
                     self.logger.warning(f"Failed to log position to database: {e}")
+            
+            # Send trade alert
+            side_text = "LONG" if 'long' in action_type else "SHORT"
+            alert_message = f"🎯 Trade Executed: {side_text} {symbol}\nSize: {filled_size:.6f}\nPrice: ${average_price:.2f}\nExchange: {self.config.exchange_name.upper()}"
+            self.alert_system.send_alert(alert_message, "info")
         else:
             # Closing position - calculate P&L
             if current_position.get('entry_price'):
@@ -848,6 +859,12 @@ class CCXTTrader:
                 
                 self.daily_pnl += net_pnl
                 self.logger.info(f"Position closed: P&L = {net_pnl:.2f} USDT")
+                
+                # Send position close alert
+                pnl_emoji = "💰" if net_pnl > 0 else "📉"
+                alert_message = f"{pnl_emoji} Position Closed: {symbol}\nSize: {filled_size:.6f}\nClose Price: ${average_price:.2f}\nP&L: {net_pnl:.2f} USDT\nDaily P&L: {self.daily_pnl:.2f} USDT"
+                alert_level = "info" if net_pnl > 0 else "warning" if net_pnl > -100 else "error"
+                self.alert_system.send_alert(alert_message, alert_level)
                 
             # Clear position
             self.positions[symbol] = {'size': 0, 'entry_price': None}

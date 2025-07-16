@@ -32,6 +32,12 @@ class AlertSystem:
             if self.config.enable_slack_alerts:
                 self._send_slack(message, level)
 
+            if self.config.enable_telegram_alerts:
+                self._send_telegram(message, level)
+
+            if self.config.enable_discord_alerts:
+                self._send_discord(message, level)
+
             self.logger.info(f"Alert sent: {level} - {message[:50]}...")
 
         except Exception as e:
@@ -91,26 +97,43 @@ class AlertSystem:
 
             emoji = emoji_map.get(level, ":robot_face:")
 
+            # Use modern Slack blocks format for better presentation
             payload = {
                 "text": f"{emoji} Trading Bot Alert",
-                "attachments": [
+                "blocks": [
                     {
-                        "color": "danger" if level == "error" else "warning" if level == "warning" else "good",
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"{emoji} Trading Bot Alert"
+                        }
+                    },
+                    {
+                        "type": "section",
                         "fields": [
                             {
-                                "title": "Level",
-                                "value": level.upper(),
-                                "short": True
+                                "type": "mrkdwn",
+                                "text": f"*Level:*\n{level.upper()}"
                             },
                             {
-                                "title": "Time",
-                                "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "short": True
-                            },
+                                "type": "mrkdwn", 
+                                "text": f"*Time:*\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Message:*\n{message}"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
                             {
-                                "title": "Message",
-                                "value": message,
-                                "short": False
+                                "type": "mrkdwn",
+                                "text": "Trading Bot Notification"
                             }
                         ]
                     }
@@ -122,3 +145,92 @@ class AlertSystem:
 
         except Exception as e:
             self.logger.error(f"Error sending Slack notification: {e}")
+
+    def _send_telegram(self, message: str, level: str) -> None:
+        """Send Telegram bot notification"""
+        if not all([self.config.telegram_bot_token, self.config.telegram_chat_id]):
+            return
+
+        try:
+            # Emoji by level
+            emoji_map = {
+                "info": "ℹ️",
+                "warning": "⚠️",
+                "error": "🚨"
+            }
+
+            emoji = emoji_map.get(level, "🤖")
+            
+            formatted_message = f"{emoji} *Trading Bot Alert*\n\n"
+            formatted_message += f"*Level:* {level.upper()}\n"
+            formatted_message += f"*Time:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            formatted_message += f"*Message:*\n{message}"
+
+            url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
+            payload = {
+                "chat_id": self.config.telegram_chat_id,
+                "text": formatted_message,
+                "parse_mode": "Markdown"
+            }
+
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+
+        except Exception as e:
+            self.logger.error(f"Error sending Telegram notification: {e}")
+
+    def _send_discord(self, message: str, level: str) -> None:
+        """Send Discord webhook notification"""
+        if not self.config.discord_webhook_url:
+            return
+
+        try:
+            # Emoji by level
+            emoji_map = {
+                "info": "ℹ️",
+                "warning": "⚠️", 
+                "error": "🚨"
+            }
+
+            emoji = emoji_map.get(level, "🤖")
+            
+            # Discord embed colors
+            color_map = {
+                "info": 0x3498db,     # Blue
+                "warning": 0xf39c12,  # Orange
+                "error": 0xe74c3c     # Red
+            }
+
+            color = color_map.get(level, 0x95a5a6)  # Gray default
+
+            payload = {
+                "embeds": [
+                    {
+                        "title": f"{emoji} Trading Bot Alert",
+                        "description": message,
+                        "color": color,
+                        "fields": [
+                            {
+                                "name": "Level",
+                                "value": level.upper(),
+                                "inline": True
+                            },
+                            {
+                                "name": "Time",
+                                "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "inline": True
+                            }
+                        ],
+                        "footer": {
+                            "text": "Trading Bot Notification"
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+                ]
+            }
+
+            response = requests.post(self.config.discord_webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+
+        except Exception as e:
+            self.logger.error(f"Error sending Discord notification: {e}")

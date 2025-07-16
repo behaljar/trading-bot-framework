@@ -55,8 +55,19 @@ class TradingConfig:
     allow_short: bool = get_env_value("ALLOW_SHORT", "false").lower() == "true"
     trading_type: str = get_env_value("TRADING_TYPE", "spot")  # spot or future
 
-    # Monitoring
+    # Monitoring and Alerts
     alert_email: str = get_env_value("ALERT_EMAIL", "")
+    alert_email_password: str = get_env_value("ALERT_EMAIL_PASSWORD", "")
+    smtp_server: str = get_env_value("SMTP_SERVER", "")
+    smtp_port: int = int(get_env_value("SMTP_PORT", "587"))
+    slack_webhook_url: str = get_env_value("SLACK_WEBHOOK_URL", "")
+    discord_webhook_url: str = get_env_value("DISCORD_WEBHOOK_URL", "")
+    telegram_bot_token: str = get_env_value("TELEGRAM_BOT_TOKEN", "")
+    telegram_chat_id: str = get_env_value("TELEGRAM_CHAT_ID", "")
+    enable_email_alerts: bool = get_env_value("ENABLE_EMAIL_ALERTS", "false").lower() == "true"
+    enable_slack_alerts: bool = get_env_value("ENABLE_SLACK_ALERTS", "false").lower() == "true"
+    enable_discord_alerts: bool = get_env_value("ENABLE_DISCORD_ALERTS", "false").lower() == "true"
+    enable_telegram_alerts: bool = get_env_value("ENABLE_TELEGRAM_ALERTS", "false").lower() == "true"
     log_level: str = get_env_value("LOG_LEVEL", "INFO")
     use_json_logs: bool = get_env_value("USE_JSON_LOGS", "true").lower() == "true"
     
