@@ -19,8 +19,8 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from data.yahoo_finance import YahooFinanceSource
-from data.ccxt_source import CCXTSource
+from framework.data.sources.yahoo_source import YahooFinanceSource
+from framework.data.sources.ccxt_source import CCXTSource
 
 
 def validate_date(date_string):
@@ -210,10 +210,10 @@ Note: Large date ranges are automatically chunked to avoid API limits.
                        help="Exchange name for CCXT (default: binance)")
     parser.add_argument("--sandbox", action="store_true",
                        help="Use sandbox/testnet instead of live exchange (CCXT only)")
-    parser.add_argument("--output-dir", default="data/csv",
-                       help="Output directory (default: data/csv)")
+    parser.add_argument("--output-dir", default="data/raw",
+                       help="Output directory (default: data/raw)")
     parser.add_argument("--filename",
-                       help="Custom filename (default: SYMBOL.csv)")
+                       help="Custom filename (default: auto-generated with dates/timeframe/source)")
     
     args = parser.parse_args()
     
@@ -235,13 +235,15 @@ Note: Large date ranges are automatically chunked to avoid API limits.
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate filename
+    # Generate filename with descriptive format
     if args.filename:
         filename = args.filename
     else:
-        # Clean symbol for filename (replace / with _)
-        clean_symbol = args.symbol.replace('/', '_')
-        filename = f"{clean_symbol}.csv"
+        # Clean symbol for filename (replace / and other special chars with _)
+        clean_symbol = args.symbol.replace('/', '_').replace(':', '_').replace('-', '_')
+        
+        # Generate descriptive filename: SYMBOL_SOURCE_TIMEFRAME_START_END.csv
+        filename = f"{clean_symbol}_{args.source}_{args.timeframe}_{start_date}_{end_date}.csv"
     
     output_path = output_dir / filename
     
