@@ -17,22 +17,18 @@ def get_strategy(strategy_name: str, params: dict = None):
         params = {}
     
     # Import strategies
-    from framework.strategies.trend_following import SMAStrategy
-    from framework.strategies.mean_reversion import MeanReversion
-    from framework.strategies.breakout_strategy import BreakoutStrategy
+    from framework.strategies.sma_strategy import SMAStrategy
     
     strategy_map = {
         'sma': SMAStrategy,
         'trend_following': SMAStrategy,
-        'mean_reversion': MeanReversion,
-        'breakout': BreakoutStrategy
     }
     
     strategy_class = strategy_map.get(strategy_name.lower())
     if not strategy_class:
         raise ValueError(f"Unknown strategy: {strategy_name}")
     
-    return strategy_class(params)
+    return strategy_class(**params)
 
 
 def load_data(file_path: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:

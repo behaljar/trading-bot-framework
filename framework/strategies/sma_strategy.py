@@ -103,3 +103,7 @@ class SMAStrategy(BaseStrategy):
         return (f"Simple Moving Average Crossover Strategy with "
                 f"{self.short_window}-period short MA and {self.long_window}-period long MA. "
                 f"Position size: {self.position_size * 100}%.{risk_desc}")
+    
+    def get_strategy_name(self) -> str:
+        """Return strategy name for identification."""
+        return self.name

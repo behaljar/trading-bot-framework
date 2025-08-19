@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["framework"]
+
+[project]
+name = "trading-framework"
+version = "0.1.0"
+description = "A comprehensive Python framework for algorithmic trading strategy development, backtesting, and analysis"
+readme = "README.md"
+authors = [
+    {name = "Trading Framework Team"}
+]
+requires-python = ">=3.12.3"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    # Core dependencies - essential for framework
+    "pandas>=2.0.0",
+    "numpy>=1.24.0,<2.0.0",
+    
+    # Data sources - required for download and backtesting
+    "yfinance>=0.2.18",       # Yahoo Finance data
+    "ccxt>=4.2.0",            # Cryptocurrency exchange data
+    
+    # Visualization - required for tests
+    "matplotlib>=3.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.0.0",
+]
+
+# Technical analysis packages (have version conflicts with pandas 2.0+)
+# Install manually if needed: uv add volprofile candlestick --constraint pandas<2.0
+technical-analysis = [
+    "volprofile>=1.0.0",      # Volume profile analysis  
+    "candlestick>=0.0.8",     # Candlestick pattern detection
+]
+
+[project.urls]
+Homepage = "https://github.com/pecan987/trading-bot-framework"
+Repository = "https://github.com/pecan987/trading-bot-framework"
+
+[project.scripts]
+download-data = "scripts.download_data:main"
+run-backtest = "scripts.run_backtest:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=framework --cov-report=html --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["framework"]
+omit = [
+    "tests/*",
+    "scripts/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.0.0",
+]
