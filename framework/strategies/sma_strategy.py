@@ -11,8 +11,8 @@ class SMAStrategy(BaseStrategy):
     and sell signals when short MA crosses below long MA.
     """
     
-    def __init__(self, short_window: int = 10, long_window: int = 30, 
-                 position_size: float = 1.0, risk_manager=None):
+    def __init__(self, short_window: int = 20, long_window: int = 50,
+                 position_size: float = 0.01, risk_manager=None):
         """
         Initialize the strategy.
         
@@ -27,7 +27,7 @@ class SMAStrategy(BaseStrategy):
             'long_window': long_window,
             'position_size': position_size
         }
-        super().__init__("Simple MA Crossover", parameters, risk_manager)
+        super().__init__("SMA", parameters, risk_manager)
         
         self.short_window = short_window
         self.long_window = long_window

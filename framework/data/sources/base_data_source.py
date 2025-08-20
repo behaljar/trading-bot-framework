@@ -21,7 +21,7 @@ class DataSource(ABC):
             timeframe: Data timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M)
             
         Returns:
-            DataFrame with columns: Open, High, Low, Close, Volume and timestamp index
+            DataFrame with columns: open, high, low, close, volume and timestamp index
         """
         pass
         

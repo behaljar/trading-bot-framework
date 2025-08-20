@@ -21,7 +21,6 @@ def get_strategy(strategy_name: str, params: dict = None):
     
     strategy_map = {
         'sma': SMAStrategy,
-        'trend_following': SMAStrategy,
     }
     
     strategy_class = strategy_map.get(strategy_name.lower())

@@ -7,7 +7,7 @@ This guide covers how to download financial data for use with the trading framew
 ### 1. CCXT (Cryptocurrency Exchanges)
 - **Purpose**: Download cryptocurrency data from various exchanges
 - **Supported Exchanges**: Binance, Coinbase, Kraken, and many others
-- **Data Types**: OHLCV (Open, High, Low, Close, Volume) candlestick data
+- **Data Types**: OHLCV (open, high, low, close, volume) candlestick data
 - **Rate Limiting**: Built-in rate limiting and chunking for large date ranges
 - **Timeframes**: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M (exchange-dependent)
 
@@ -79,10 +79,10 @@ The download script automatically handles large date ranges by breaking them int
 
 ### Data Output Format
 
-All downloaded data is saved as CSV files with standardized columns:
+All downloaded data is saved as CSV files with standardized lowercase columns:
 
 ```csv
-timestamp,Open,High,Low,Close,Volume
+timestamp,open,high,low,close,volume
 2023-01-01 00:00:00,16625.08,16625.08,16531.0,16688.74,1200.5
 2023-01-02 00:00:00,16688.74,16950.0,16688.74,16830.0,950.2
 ...
@@ -90,12 +90,17 @@ timestamp,Open,High,Low,Close,Volume
 
 **Column Specifications:**
 - `timestamp`: DateTime index in ISO format
-- `Open/High/Low/Close`: Price data as float values
-- `Volume`: Trading volume as float
+- `open`: Opening price as float
+- `high`: Highest price as float
+- `low`: Lowest price as float
+- `close`: Closing price as float
+- `volume`: Trading volume as float
+
+**Note:** All column names are lowercase for consistency across all data sources
 
 ## Data Source Implementation Details
 
-### CCXT Source (`framework/data/downloaders/ccxt_downloader.py`)
+### CCXT Source (`framework/data/sources/ccxt_source.py`)
 
 **Features:**
 - Dynamic exchange initialization with error handling
@@ -120,12 +125,12 @@ source = CCXTSource(
 - Auto-normalization to exchange format
 - Validation against available markets
 
-### Yahoo Finance Source (`framework/data/downloaders/yahoo_downloader.py`)
+### Yahoo Finance Source (`framework/data/sources/yahoo_source.py`)
 
 **Features:**
 - Direct integration with yfinance library
 - Automatic timeframe mapping
-- Column standardization to match framework expectations
+- Column standardization to lowercase format
 - Current price retrieval
 - Error handling for unavailable symbols/dates
 
@@ -224,4 +229,4 @@ python scripts/download_data.py --source ccxt --symbol BTC/USDT --start 2023-01-
 python scripts/run_backtest.py --strategy sma --data-file data/csv/BTC_USDT.csv --symbol BTC_USDT
 ```
 
-The framework expects data in the standardized format produced by the download scripts, making the integration seamless.
+The framework expects data with lowercase column names (open, high, low, close, volume) as produced by the download scripts, making the integration seamless.

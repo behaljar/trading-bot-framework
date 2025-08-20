@@ -23,21 +23,16 @@ class YahooFinanceSource(DataSource):
             ticker = yf.Ticker(symbol)
             data = ticker.history(start=start_date, end=end_date, interval=interval)
 
-            # Standardize column names
+            # Standardize column names to lowercase
             if not data.empty:
-                # Only map existing columns to avoid length mismatch
-                expected_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-                available_cols = list(data.columns)
-                
-                # Map only the columns that exist
-                new_columns = []
-                for i, col in enumerate(available_cols):
-                    if i < len(expected_cols):
-                        new_columns.append(expected_cols[i])
-                    else:
-                        new_columns.append(col)
-                
-                data.columns = new_columns
+                # Rename columns to lowercase
+                data = data.rename(columns={
+                    'Open': 'open',
+                    'High': 'high', 
+                    'Low': 'low',
+                    'Close': 'close',
+                    'Volume': 'volume'
+                })
                 data.index.name = 'timestamp'
 
             return data
@@ -50,7 +45,13 @@ class YahooFinanceSource(DataSource):
         try:
             ticker = yf.Ticker(symbol)
             current_data = ticker.history(period="1d")
-            return float(current_data['Close'].iloc[-1])
+            # Use lowercase column name
+            if 'Close' in current_data.columns:
+                return float(current_data['Close'].iloc[-1])
+            elif 'close' in current_data.columns:
+                return float(current_data['close'].iloc[-1])
+            else:
+                return 0.0
         except Exception as e:
             print(f"Error getting current price from Yahoo Finance for {symbol}: {e}")
             return 0.0

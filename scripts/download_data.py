@@ -242,8 +242,11 @@ Note: Large date ranges are automatically chunked to avoid API limits.
         # Clean symbol for filename (replace / and other special chars with _)
         clean_symbol = args.symbol.replace('/', '_').replace(':', '_').replace('-', '_')
         
+        # Use exchange name instead of 'ccxt' for CCXT source
+        source_name = args.exchange if args.source == "ccxt" else args.source
+        
         # Generate descriptive filename: SYMBOL_SOURCE_TIMEFRAME_START_END.csv
-        filename = f"{clean_symbol}_{args.source}_{args.timeframe}_{start_date}_{end_date}.csv"
+        filename = f"{clean_symbol}_{source_name}_{args.timeframe}_{start_date}_{end_date}.csv"
     
     output_path = output_dir / filename
     

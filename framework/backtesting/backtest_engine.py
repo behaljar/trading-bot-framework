@@ -480,17 +480,59 @@ class BacktestEngine:
         self.logger.info(f"Price range: ${data['close'].min():.2f} - ${data['close'].max():.2f}")
     
     def _save_results(self, result: BacktestResult, strategy_name: str, symbol: str):
-        """Save backtest results to JSON file"""
+        """Save backtest results to JSON and trades to CSV"""
         from datetime import datetime
+        import csv
+        
+        # Clean symbol for filename (replace special chars with underscore)
+        clean_symbol = symbol.replace('/', '_').replace('\\', '_').replace(':', '_')
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = os.path.join(self.output_dir, f"{strategy_name}_{symbol}_{timestamp}_results.json")
+        base_filename = f"{strategy_name}_{clean_symbol}_{timestamp}"
         
-        # Convert result to dictionary and save
+        # Save JSON results
+        json_file = os.path.join(self.output_dir, f"{base_filename}_results.json")
         result_dict = result.to_dict()
         
-        with open(output_file, 'w') as f:
+        with open(json_file, 'w') as f:
             json.dump(result_dict, f, indent=2, default=str)
         
-        self.logger.info(f"Results saved to: {output_file}")
+        # Save trades to CSV
+        csv_file = os.path.join(self.output_dir, f"{base_filename}_trades.csv")
+        self._save_trades_to_csv(result.trades, csv_file)
+        
+        self.logger.info(f"Results saved to: {json_file}")
+        self.logger.info(f"Trades saved to: {csv_file}")
         self.logger.info(f"\n{result.summary()}")
+    
+    def _save_trades_to_csv(self, trades: List[Trade], csv_file: str):
+        """Save trades list to CSV file for analysis"""
+        import csv
+        
+        if not trades:
+            self.logger.warning("No trades to save to CSV")
+            return
+        
+        # Define CSV headers based on Trade dataclass fields
+        headers = ['timestamp', 'symbol', 'side', 'price', 'quantity', 'value', 'commission', 'net_value']
+        
+        with open(csv_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+            
+            for trade in trades:
+                # Calculate commission (0.1% default)
+                commission = trade.value * self.commission
+                net_value = trade.value - commission if trade.side == TradeSide.BUY else trade.value - commission
+                
+                row = {
+                    'timestamp': trade.timestamp,
+                    'symbol': trade.symbol,
+                    'side': trade.side.value,
+                    'price': round(trade.price, 2),
+                    'quantity': round(trade.quantity, 8),
+                    'value': round(trade.value, 2),
+                    'commission': round(commission, 2),
+                    'net_value': round(net_value, 2)
+                }
+                writer.writerow(row)
