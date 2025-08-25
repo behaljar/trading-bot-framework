@@ -2,6 +2,7 @@
 data/raw/
 data/csv/
 data/processed/
+data/cleaned/
 *.csv
 *.parquet
 *.h5
