@@ -12,7 +12,8 @@ class SMAStrategy(BaseStrategy):
     """
     
     def __init__(self, short_window: int = 20, long_window: int = 50,
-                 position_size: float = 0.01, risk_manager=None):
+                 position_size: float = 0.01, stop_loss_pct: float = None, 
+                 take_profit_pct: float = None, risk_manager=None):
         """
         Initialize the strategy.
         
@@ -20,18 +21,24 @@ class SMAStrategy(BaseStrategy):
             short_window: Period for short moving average
             long_window: Period for long moving average  
             position_size: Fraction of portfolio to use for each trade (0.0 to 1.0)
+            stop_loss_pct: Stop loss percentage (e.g., 0.02 for 2% stop loss)
+            take_profit_pct: Take profit percentage (e.g., 0.04 for 4% take profit)
             risk_manager: Risk manager instance for position sizing and stop-loss
         """
         parameters = {
             'short_window': short_window,
             'long_window': long_window,
-            'position_size': position_size
+            'position_size': position_size,
+            'stop_loss_pct': stop_loss_pct,
+            'take_profit_pct': take_profit_pct
         }
         super().__init__("SMA", parameters, risk_manager)
         
         self.short_window = short_window
         self.long_window = long_window
         self.position_size = position_size
+        self.stop_loss_pct = stop_loss_pct
+        self.take_profit_pct = take_profit_pct
         
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -52,22 +59,13 @@ class SMAStrategy(BaseStrategy):
         df['ma_short'] = df['close'].rolling(window=self.short_window).mean()
         df['ma_long'] = df['close'].rolling(window=self.long_window).mean()
         
-        # Initialize signal column
+        # Initialize signal columns
         df['signal'] = 0
         df['position_size'] = self.position_size
+        df['stop_loss'] = None
+        df['take_profit'] = None
         
-        # Generate signals
-        # Buy when short MA crosses above long MA
-        df.loc[df['ma_short'] > df['ma_long'], 'signal'] = 1
-        
-        # Sell when short MA crosses below long MA  
-        df.loc[df['ma_short'] < df['ma_long'], 'signal'] = -1
-        
-        # Only generate signals when we have enough data for both MAs
-        min_periods = max(self.short_window, self.long_window)
-        df.iloc[:min_periods, df.columns.get_loc('signal')] = 0
-        
-        # Only signal on actual crossovers, not just when one is above the other
+        # Generate crossover signals
         df['ma_short_prev'] = df['ma_short'].shift(1)
         df['ma_long_prev'] = df['ma_long'].shift(1)
         
@@ -83,10 +81,22 @@ class SMAStrategy(BaseStrategy):
             (df['ma_short_prev'] >= df['ma_long_prev'])
         )
         
-        # Reset signals to only crossovers
-        df['signal'] = 0
+        # Apply crossover signals
         df.loc[buy_condition, 'signal'] = 1
         df.loc[sell_condition, 'signal'] = -1
+        
+        # Only generate signals when we have enough data for both MAs
+        min_periods = max(self.short_window, self.long_window)
+        df.iloc[:min_periods, df.columns.get_loc('signal')] = 0
+        
+        # Calculate stop loss and take profit for buy signals
+        if self.stop_loss_pct is not None:
+            buy_mask = df['signal'] == 1
+            df.loc[buy_mask, 'stop_loss'] = df.loc[buy_mask, 'close'] * (1 - self.stop_loss_pct)
+        
+        if self.take_profit_pct is not None:
+            buy_mask = df['signal'] == 1
+            df.loc[buy_mask, 'take_profit'] = df.loc[buy_mask, 'close'] * (1 + self.take_profit_pct)
         
         # Clean up temporary columns
         df = df.drop(['ma_short_prev', 'ma_long_prev'], axis=1)
@@ -100,9 +110,17 @@ class SMAStrategy(BaseStrategy):
             risk_metrics = self.risk_manager.get_risk_metrics()
             risk_desc = f" Risk management: {risk_metrics.get('risk_management_type', 'Unknown')}"
         
+        sl_desc = ""
+        if self.stop_loss_pct is not None:
+            sl_desc = f" Stop loss: {self.stop_loss_pct * 100}%."
+            
+        tp_desc = ""
+        if self.take_profit_pct is not None:
+            tp_desc = f" Take profit: {self.take_profit_pct * 100}%."
+        
         return (f"Simple Moving Average Crossover Strategy with "
                 f"{self.short_window}-period short MA and {self.long_window}-period long MA. "
-                f"Position size: {self.position_size * 100}%.{risk_desc}")
+                f"Position size: {self.position_size * 100}%.{sl_desc}{tp_desc}{risk_desc}")
     
     def get_strategy_name(self) -> str:
         """Return strategy name for identification."""

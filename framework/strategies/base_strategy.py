@@ -28,6 +28,8 @@ class BaseStrategy(ABC):
             DataFrame with same index as input data and additional columns:
             - 'signal': 1 for buy, -1 for sell, 0 for hold
             - 'position_size': fraction of portfolio to allocate (0.0 to 1.0)
+            - 'stop_loss' (optional): stop loss price level for the position
+            - 'take_profit' (optional): take profit price level for the position
         """
         pass
         

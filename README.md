@@ -60,7 +60,12 @@ python scripts/download_data.py --source ccxt --symbol BTC/USDT --exchange binan
 
 ### Run Backtest
 ```bash
-python scripts/run_backtest.py --strategy sma --data-file data/raw/AAPL_yahoo_1d_2023-01-01_2023-12-31.csv --symbol AAPL
+# Basic backtest
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT.csv --symbol BTC_USDT
+
+# With custom parameters
+STRATEGY_PARAMS='{"short_window": 10, "long_window": 20, "position_size": 0.1}' \
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT.csv --symbol BTC_USDT
 ```
 
 ## Architecture
@@ -72,6 +77,23 @@ python scripts/run_backtest.py --strategy sma --data-file data/raw/AAPL_yahoo_1d
 - `scripts/` - Utility scripts for data download and backtesting
 - `tests/` - Comprehensive test suite
 
+## Documentation
+
+### Comprehensive Guides
+
+- **[Data Downloading](docs/DATA_DOWNLOADING.md)**: Complete guide for downloading financial data from multiple sources (Yahoo Finance, CCXT exchanges)
+- **[Data Preprocessing](docs/DATA_PREPROCESS.md)**: Data cleaning, validation, and feature engineering pipeline
+- **[Backtesting](docs/BACKTEST.md)**: Professional backtesting with risk management and performance analysis
+- **[Development Guide](CLAUDE.md)**: Developer instructions and framework architecture details
+
+### Key Features Covered
+
+- **Multi-Source Data**: Yahoo Finance (stocks, ETFs) and CCXT (cryptocurrency exchanges)
+- **Data Quality**: Automated validation, cleaning, and gap filling
+- **Professional Backtesting**: Industry-standard metrics with `backtesting.py` integration
+- **Risk Management**: Built-in stop loss, take profit, and position sizing
+- **Strategy Development**: Extensible framework for custom trading strategies
+
 ## Testing
 
 ```bash
@@ -82,4 +104,6 @@ python -m pytest tests/
 python -m pytest tests/ --cov=framework
 ```
 
-See `CLAUDE.md` for detailed development guidance.
+## Contributing
+
+See `CLAUDE.md` for detailed development guidance and framework architecture.

@@ -46,15 +46,23 @@ This is a comprehensive Python trading framework for algorithmic trading strateg
 ## Common Development Commands
 
 ### Running Backtests
+
+**Backtest Engine (using backtesting.py library):**
 ```bash
 # Basic backtest with SMA strategy
-python scripts/run_backtest.py --strategy sma --data-file data/csv/BTCUSDT.csv --symbol BTC_USDT
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+
+# Backtest with stop loss and take profit
+STRATEGY_PARAMS='{"short_window": 10, "long_window": 20, "position_size": 0.5, "stop_loss_pct": 0.02, "take_profit_pct": 0.04}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2024-01-01 --end 2024-01-10
+
+# Backtest with higher initial capital for high-priced assets
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --initial-capital 100000 --commission 0.001
 
 # Backtest with date range and debug logging
-python scripts/run_backtest.py --strategy sma --data-file data/csv/BTCUSDT.csv --symbol BTC_USDT --start 2023-01-01 --end 2023-12-31 --debug
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2023-01-01 --end 2023-12-31 --debug
 
-# Backtest with custom strategy parameters via environment variables
-STRATEGY_PARAMS='{"short_window": 5, "long_window": 20, "position_size": 0.5}' python scripts/run_backtest.py --strategy sma --data-file data/csv/BTCUSDT.csv --symbol BTC_USDT
+# Use standard backtest instead of fractional (not recommended for crypto)
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --use-standard
 ```
 
 ### Testing

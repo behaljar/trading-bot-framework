@@ -27,13 +27,12 @@ dependencies = [
     # Core dependencies - essential for framework
     "pandas>=2.0.0",
     "numpy>=1.24.0,<2.0.0",
-    
     # Data sources - required for download and backtesting
-    "yfinance>=0.2.18",       # Yahoo Finance data
-    "ccxt>=4.2.0",            # Cryptocurrency exchange data
-    
+    "yfinance>=0.2.18", # Yahoo Finance data
+    "ccxt>=4.2.0", # Cryptocurrency exchange data
     # Visualization - required for tests
     "matplotlib>=3.7.0",
+    "backtesting",
 ]
 
 [project.optional-dependencies]
@@ -42,12 +41,6 @@ dev = [
     "pytest-cov>=4.0.0",
 ]
 
-# Technical analysis packages (have version conflicts with pandas 2.0+)
-# Install manually if needed: uv add volprofile candlestick --constraint pandas<2.0
-technical-analysis = [
-    "volprofile>=1.0.0",      # Volume profile analysis  
-    "candlestick>=0.0.8",     # Candlestick pattern detection
-]
 
 [project.urls]
 Homepage = "https://github.com/pecan987/trading-bot-framework"
