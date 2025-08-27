@@ -89,14 +89,22 @@ class SMAStrategy(BaseStrategy):
         min_periods = max(self.short_window, self.long_window)
         df.iloc[:min_periods, df.columns.get_loc('signal')] = 0
         
-        # Calculate stop loss and take profit for buy signals
+        # Calculate stop loss and take profit for buy signals (long positions)
         if self.stop_loss_pct is not None:
             buy_mask = df['signal'] == 1
             df.loc[buy_mask, 'stop_loss'] = df.loc[buy_mask, 'close'] * (1 - self.stop_loss_pct)
+            
+            # For short positions, stop loss is above entry price
+            sell_mask = df['signal'] == -1
+            df.loc[sell_mask, 'stop_loss'] = df.loc[sell_mask, 'close'] * (1 + self.stop_loss_pct)
         
         if self.take_profit_pct is not None:
             buy_mask = df['signal'] == 1
             df.loc[buy_mask, 'take_profit'] = df.loc[buy_mask, 'close'] * (1 + self.take_profit_pct)
+            
+            # For short positions, take profit is below entry price
+            sell_mask = df['signal'] == -1
+            df.loc[sell_mask, 'take_profit'] = df.loc[sell_mask, 'close'] * (1 - self.take_profit_pct)
         
         # Clean up temporary columns
         df = df.drop(['ma_short_prev', 'ma_long_prev'], axis=1)

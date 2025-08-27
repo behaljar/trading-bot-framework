@@ -33,6 +33,8 @@ except ImportError:
 from framework.utils.logger import setup_logger
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.backtesting.strategy_wrapper import create_wrapper_class
+from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
+from framework.risk.fixed_risk_manager import FixedRiskManager
 
 
 def load_data(file_path: str, start_date: Optional[str] = None, 
@@ -83,7 +85,10 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
                 symbol: str,
                 initial_capital: float = 10000,
                 commission: float = 0.001,
-                use_fractional: bool = True) -> None:
+                use_fractional: bool = True,
+                risk_manager_type: str = "fixed_position",
+                risk_manager_params: Dict[str, Any] = None,
+                debug: bool = False) -> None:
     """Run backtest using backtesting.py with our framework strategies"""
     
     # Map strategy names to our framework strategy classes
@@ -100,8 +105,30 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
     # Get the framework strategy class
     FrameworkStrategyClass = framework_strategies[strategy_name]
     
+    # Create risk manager
+    risk_manager = None
+    if risk_manager_params is None:
+        risk_manager_params = {}
+        
+    if risk_manager_type == "fixed_position":
+        risk_manager = FixedPositionSizeManager(
+            position_size=risk_manager_params.get('position_size', 0.1)
+        )
+    elif risk_manager_type == "fixed_risk":
+        risk_manager = FixedRiskManager(
+            risk_percent=risk_manager_params.get('risk_percent', 0.01),
+            default_stop_distance=risk_manager_params.get('default_stop_distance', 0.02)
+        )
+    else:
+        raise ValueError(f"Unknown risk manager type: {risk_manager_type}. Available: ['fixed_position', 'fixed_risk']")
+    
     # Create wrapper strategy class
-    WrapperClass = create_wrapper_class(FrameworkStrategyClass, strategy_params)
+    WrapperClass = create_wrapper_class(
+        FrameworkStrategyClass, 
+        strategy_params,
+        risk_manager=risk_manager,
+        debug=debug
+    )
     
     # Create and run backtest
     print(f"\nRunning backtest with strategy: {strategy_name}")
@@ -161,6 +188,50 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
         json.dump(result_dict, f, indent=2, default=str)
     
     print(f"\nDetailed results saved to: {result_file}")
+    
+    # Save individual trades to CSV
+    try:
+        if hasattr(result, '_trades') and result._trades is not None:
+            trades_df = result._trades.copy()
+            
+            # Clean up trades dataframe for better CSV output
+            if not trades_df.empty:
+                # Convert datetime columns to string for better CSV readability
+                datetime_cols = ['EntryTime', 'ExitTime']
+                for col in datetime_cols:
+                    if col in trades_df.columns:
+                        trades_df[col] = trades_df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Round numeric columns for cleaner output
+                numeric_cols = ['EntryPrice', 'ExitPrice', 'PnL', 'ReturnPct', 'Size']
+                for col in numeric_cols:
+                    if col in trades_df.columns:
+                        if col in ['PnL']:
+                            trades_df[col] = trades_df[col].round(2)
+                        elif col in ['EntryPrice', 'ExitPrice']:
+                            trades_df[col] = trades_df[col].round(4)
+                        elif col in ['ReturnPct']:
+                            trades_df[col] = (trades_df[col] * 100).round(2)  # Convert to percentage
+                        elif col in ['Size']:
+                            trades_df[col] = trades_df[col].round(6)
+                
+                # Add additional useful columns
+                if 'Duration' in trades_df.columns:
+                    # Convert duration to hours for readability
+                    trades_df['DurationHours'] = trades_df['Duration'].dt.total_seconds() / 3600
+                    trades_df['DurationHours'] = trades_df['DurationHours'].round(1)
+                
+                # Save trades to CSV
+                trades_file = output_dir / f"{strategy_name}_{clean_symbol}_{timestamp}_trades.csv"
+                trades_df.to_csv(trades_file, index=False)
+                print(f"Individual trades saved to: {trades_file}")
+                print(f"Total trades: {len(trades_df)}")
+            else:
+                print("No trades were executed during the backtest period")
+        else:
+            print("Trade details not available in backtest results")
+    except Exception as e:
+        print(f"Could not save trades to CSV: {e}")
     
     # Generate plot if possible
     try:
