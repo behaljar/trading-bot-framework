@@ -1,21 +1,23 @@
 """
-FVG Strategy (M15 Timeframe with H1 Context)
+FVG Strategy (M15 Timeframe with H4 Context)
 
 Multi-timeframe FVG strategy that:
-- Uses H1 FVG context with M15 FVG confirmation
-- Only considers H1 FVGs from last 36 H1 candles
-- Requires price to touch H1 FVG before M15 FVG signal
+- Uses H4 unmitigated FVG context with M15 FVG confirmation
+- Only considers H4 FVGs from last 9 H4 candles
+- Requires price to touch unmitigated H4 FVG before M15 FVG signal
 - Only trades during specific execution windows in NY timezone
+- Daily open filter: Long above daily open, Short below daily open
 - Allows only one trade per session window
 - Excludes weekend trading
 
 Entry Conditions:
-1. H1 FVG formation within last 36 H1 candles
-2. Price must touch (wick into) the H1 FVG
-3. M15 FVG detected in same direction as H1 FVG
-4. Must be within execution time window
-5. Only ONE trade allowed per session window  
-6. NOT on weekends (Saturday/Sunday)
+1. H4 FVG formation within last 9 H4 candles that is UNMITIGATED
+2. Price must touch (wick into) the unmitigated H4 FVG
+3. Daily open filter: Long only if price above daily open, Short only if price below daily open
+4. M15 FVG detected in same direction as H4 FVG
+5. Must be within execution time window
+6. Only ONE trade allowed per session window  
+7. NOT on weekends (Saturday/Sunday)
 
 Exit Conditions:
 - Stop Loss: Low/High of first candle in M15 FVG formation
@@ -47,6 +49,7 @@ class FVGStrategy(BaseStrategy):
                  min_fvg_sensitivity: float = 0.1,
                  position_size: float = 0.1,
                  h1_lookback_candles: int = 36,
+                 h4_lookback_candles: int = 9,
                  **kwargs):
         """
         Initialize FVG strategy.
@@ -57,6 +60,7 @@ class FVGStrategy(BaseStrategy):
             min_fvg_sensitivity: Minimum FVG sensitivity ratio (default: 0.1)
             position_size: Position size as fraction of equity (default: 0.1)
             h1_lookback_candles: Number of H1 candles to look back for FVG detection (default: 36)
+            h4_lookback_candles: Number of H4 candles to look back for unmitigated FVG detection (default: 9)
         """
         super().__init__("fvg", kwargs)
         
@@ -65,6 +69,7 @@ class FVGStrategy(BaseStrategy):
         self.min_fvg_sensitivity = min_fvg_sensitivity
         self.position_size = position_size
         self.h1_lookback_candles = h1_lookback_candles
+        self.h4_lookback_candles = h4_lookback_candles
         
         # Initialize FVG detector
         self.fvg_detector = FVGDetector(min_sensitivity=min_fvg_sensitivity)
@@ -103,8 +108,8 @@ class FVGStrategy(BaseStrategy):
         signals_df['take_profit'] = np.nan
         
         # Need sufficient data for analysis
-        if len(data) < 50:
-            print(f"DEBUG: Insufficient data: {len(data)} < 50, returning empty signals")
+        if len(data) < 100:
+            print(f"DEBUG: Insufficient data: {len(data)} < 100, returning empty signals")
             return signals_df
         
         # Detect timeframe - strategy only works with M15 data
@@ -114,8 +119,8 @@ class FVGStrategy(BaseStrategy):
             print(f"DEBUG: Strategy requires 15T (M15) timeframe, got {timeframe}, returning empty signals")
             return signals_df
         
-        # Resample M15 data to H1 for H1 FVG detection
-        h1_data = data.resample('1H').agg({
+        # Resample M15 data to H4 for H4 FVG detection
+        h4_data = data.resample('4h').agg({
             'open': 'first',
             'high': 'max', 
             'low': 'min',
@@ -123,11 +128,22 @@ class FVGStrategy(BaseStrategy):
             'volume': 'sum'
         }).dropna()
         
-        print(f"DEBUG: Resampled {len(data)} M15 candles to {len(h1_data)} H1 candles")
+        print(f"DEBUG: Resampled {len(data)} M15 candles to {len(h4_data)} H4 candles")
         
-        # Detect H1 FVGs
-        h1_fvgs = self.fvg_detector.detect_fvgs(h1_data, merge_consecutive=True)
-        print(f"DEBUG: Found {len(h1_fvgs)} H1 FVGs")
+        # Detect H4 FVGs
+        h4_fvgs = self.fvg_detector.detect_fvgs(h4_data, merge_consecutive=True)
+        print(f"DEBUG: Found {len(h4_fvgs)} H4 FVGs")
+        
+        # Resample M15 data to daily for daily open filter
+        daily_data = data.resample('D').agg({
+            'open': 'first',
+            'high': 'max', 
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+        
+        print(f"DEBUG: Resampled {len(data)} M15 candles to {len(daily_data)} daily candles")
         
         # Detect M15 FVGs
         m15_fvgs = self.fvg_detector.detect_fvgs(data, merge_consecutive=True)
@@ -137,15 +153,15 @@ class FVGStrategy(BaseStrategy):
             print("DEBUG: No M15 FVGs found, returning empty signals")
             return signals_df
             
-        if len(h1_fvgs) == 0:
-            print("DEBUG: No H1 FVGs found, returning empty signals")
+        if len(h4_fvgs) == 0:
+            print("DEBUG: No H4 FVGs found, returning empty signals")
             return signals_df
         
         # Show first few FVGs for debugging
-        for i, fvg in enumerate(h1_fvgs[:3]):
-            h1_time_start = h1_data.index[fvg.start_idx] if fvg.start_idx < len(h1_data) else "N/A"
-            h1_time_end = h1_data.index[fvg.end_idx] if fvg.end_idx < len(h1_data) else "N/A"
-            print(f"  H1 FVG {i}: {fvg.fvg_type}, idx {fvg.start_idx}-{fvg.end_idx}, time {h1_time_start} - {h1_time_end}, range {fvg.bottom:.6f}-{fvg.top:.6f}")
+        for i, fvg in enumerate(h4_fvgs[:3]):
+            h4_time_start = h4_data.index[fvg.start_idx] if fvg.start_idx < len(h4_data) else "N/A"
+            h4_time_end = h4_data.index[fvg.end_idx] if fvg.end_idx < len(h4_data) else "N/A"
+            print(f"  H4 FVG {i}: {fvg.fvg_type}, idx {fvg.start_idx}-{fvg.end_idx}, time {h4_time_start} - {h4_time_end}, range {fvg.bottom:.6f}-{fvg.top:.6f}")
         
         for i, fvg in enumerate(m15_fvgs[:3]):
             print(f"  M15 FVG {i}: {fvg.fvg_type}, idx {fvg.start_idx}-{fvg.end_idx}, range {fvg.bottom:.6f}-{fvg.top:.6f}")
@@ -155,7 +171,8 @@ class FVGStrategy(BaseStrategy):
         execution_window_count = 0
         weekend_count = 0
         session_limit_count = 0
-        h1_touch_failed_count = 0
+        h4_touch_failed_count = 0
+        daily_filter_failed_count = 0
         
         for fvg in m15_fvgs:
             # Entry occurs on the close of the 3rd candle (end_idx)
@@ -183,9 +200,14 @@ class FVGStrategy(BaseStrategy):
                 session_limit_count += 1
                 continue
             
-            # Check if price has touched H1 FVG of the same type before this M15 FVG
-            if not self._has_price_touched_h1_fvg(data, h1_data, h1_fvgs, entry_idx, fvg.fvg_type):
-                h1_touch_failed_count += 1
+            # Check if price has touched H4 FVG of the same type before this M15 FVG
+            if not self._has_price_touched_h4_fvg(data, h4_data, h4_fvgs, entry_idx, fvg.fvg_type):
+                h4_touch_failed_count += 1
+                continue
+            
+            # Check daily open filter condition
+            if not self._daily_open_filter(daily_data, current_time, current_price, fvg.fvg_type):
+                daily_filter_failed_count += 1
                 continue
                 
             # Generate signal based on FVG type
@@ -226,12 +248,14 @@ class FVGStrategy(BaseStrategy):
         
         print(f"DEBUG SUMMARY:")
         print(f"  Total M15 candles processed: {len(data)}")
-        print(f"  H1 FVGs found: {len(h1_fvgs)}")
+        print(f"  H4 FVGs found: {len(h4_fvgs)}")
+        print(f"  Daily candles found: {len(daily_data)}")
         print(f"  M15 FVGs found: {len(m15_fvgs)}")
         print(f"  Execution window opportunities: {execution_window_count}")
         print(f"  Weekend blocked: {weekend_count}")
         print(f"  Session limit blocked: {session_limit_count}")
-        print(f"  H1 touch condition failed: {h1_touch_failed_count}")
+        print(f"  H4 unmitigated touch condition failed: {h4_touch_failed_count}")
+        print(f"  Daily open filter failed: {daily_filter_failed_count}")
         print(f"  Signals generated: {signals_generated}")
         
         return signals_df
@@ -315,53 +339,98 @@ class FVGStrategy(BaseStrategy):
         # Create session key: YYYY-MM-DD_window_id
         return f"{ny_time.date()}_{window_id}"
     
-    def _has_price_touched_h1_fvg(self, data: pd.DataFrame, h1_data: pd.DataFrame, h1_fvgs: list, current_idx: int, fvg_type: str) -> bool:
+    def _daily_open_filter(self, daily_data: pd.DataFrame, current_time: pd.Timestamp, current_price: float, fvg_type: str) -> bool:
         """
-        Check if price has touched (wicked into) any H1 FVG of the same type from the last 36 H1 candles before current M15 candle.
+        Filter trades based on daily open:
+        - Long trades only if price is above daily open
+        - Short trades only if price is below daily open
+        
+        Args:
+            daily_data: Daily OHLCV data
+            current_time: Current M15 candle timestamp
+            current_price: Current price
+            fvg_type: 'bullish' or 'bearish'
+            
+        Returns:
+            True if trade direction aligns with daily open filter
+        """
+        # Find the current day's open price
+        current_daily_open = None
+        for i, day_start_time in enumerate(daily_data.index):
+            # Check if current time falls within this day
+            if i + 1 < len(daily_data):
+                next_day_start = daily_data.index[i + 1]
+                if day_start_time <= current_time < next_day_start:
+                    current_daily_open = daily_data.iloc[i]['open']
+                    break
+            else:
+                # Last day in data
+                if day_start_time <= current_time:
+                    current_daily_open = daily_data.iloc[i]['open']
+                    break
+        
+        if current_daily_open is None:
+            return False
+            
+        # Apply daily open filter
+        if fvg_type == 'bullish':
+            # Long only if price is above daily open
+            return current_price > current_daily_open
+        elif fvg_type == 'bearish':
+            # Short only if price is below daily open
+            return current_price < current_daily_open
+            
+        return False
+    
+    def _has_price_touched_h4_fvg(self, data: pd.DataFrame, h4_data: pd.DataFrame, h4_fvgs: list, current_idx: int, fvg_type: str) -> bool:
+        """
+        Check if price has touched (wicked into) any H4 FVG of the same type from the last 9 H4 candles before current M15 candle.
         
         Args:
             data: M15 OHLCV data
-            h1_data: H1 OHLCV data  
-            h1_fvgs: List of H1 FVGs
+            h4_data: H4 OHLCV data  
+            h4_fvgs: List of H4 FVGs
             current_idx: Current M15 candle index
             fvg_type: 'bullish' or 'bearish'
             
         Returns:
-            True if price has touched an H1 FVG of the same type within lookback period
+            True if price has touched an H4 FVG of the same type within lookback period
         """
         current_time = data.index[current_idx]
         
-        # Find the H1 candle index that corresponds to current M15 time
-        current_h1_idx = None
-        for i, h1_time in enumerate(h1_data.index):
-            if h1_time <= current_time:
-                current_h1_idx = i
+        # Find the H4 candle index that corresponds to current M15 time
+        current_h4_idx = None
+        for i, h4_time in enumerate(h4_data.index):
+            if h4_time <= current_time:
+                current_h4_idx = i
             else:
                 break
         
-        if current_h1_idx is None:
+        if current_h4_idx is None:
             return False
         
-        # Calculate lookback range - only consider H1 FVGs from last 36 H1 candles
-        lookback_start_idx = max(0, current_h1_idx - self.h1_lookback_candles + 1)
+        # Calculate lookback range - only consider H4 FVGs from last 9 H4 candles
+        lookback_start_idx = max(0, current_h4_idx - self.h4_lookback_candles + 1)
         
-        # Find relevant H1 FVGs of the same type within lookback period
-        relevant_h1_fvgs = []
-        for fvg in h1_fvgs:
+        # Find relevant H4 FVGs of the same type within lookback period that are unmitigated
+        relevant_h4_fvgs = []
+        for fvg in h4_fvgs:
             if (fvg.fvg_type == fvg_type and 
-                fvg.end_idx < len(h1_data) and
+                fvg.end_idx < len(h4_data) and
                 fvg.end_idx >= lookback_start_idx and
-                fvg.end_idx < current_h1_idx):
-                h1_fvg_end_time = h1_data.index[fvg.end_idx]
-                if h1_fvg_end_time < current_time:
-                    relevant_h1_fvgs.append((fvg, h1_fvg_end_time))
+                fvg.end_idx < current_h4_idx):
+                h4_fvg_end_time = h4_data.index[fvg.end_idx]
+                if h4_fvg_end_time < current_time:
+                    # Check if H4 FVG is unmitigated from its formation until current H4 candle
+                    if self._is_fvg_unmitigated(h4_data, fvg, fvg.end_idx, current_h4_idx):
+                        relevant_h4_fvgs.append((fvg, h4_fvg_end_time))
         
-        if not relevant_h1_fvgs:
+        if not relevant_h4_fvgs:
             return False
         
-        # Check if price has touched any of these H1 FVGs
-        for fvg, fvg_end_time in relevant_h1_fvgs:
-            # Look at M15 candles from after H1 FVG formation until current candle
+        # Check if price has touched any of these H4 FVGs
+        for fvg, fvg_end_time in relevant_h4_fvgs:
+            # Look at M15 candles from after H4 FVG formation until current candle
             start_search_idx = None
             for i in range(len(data)):
                 if data.index[i] > fvg_end_time:
@@ -371,27 +440,57 @@ class FVGStrategy(BaseStrategy):
             if start_search_idx is None:
                 continue
                 
-            # Check if any M15 candle from start_search_idx to current_idx touched the H1 FVG
+            # Check if any M15 candle from start_search_idx to current_idx touched the H4 FVG
             for i in range(start_search_idx, min(current_idx + 1, len(data))):
                 candle_high = data.iloc[i]['high']
                 candle_low = data.iloc[i]['low']
                 
-                # Check if candle wicked into the H1 FVG
+                # Check if candle wicked into the H4 FVG
                 if fvg.fvg_type == 'bullish':
-                    # For bullish H1 FVG, check if price wicked down into the gap
+                    # For bullish H4 FVG, check if price wicked down into the gap
                     if candle_low <= fvg.top and candle_low >= fvg.bottom:
                         return True
                 elif fvg.fvg_type == 'bearish':
-                    # For bearish H1 FVG, check if price wicked up into the gap
+                    # For bearish H4 FVG, check if price wicked up into the gap
                     if candle_high >= fvg.bottom and candle_high <= fvg.top:
                         return True
         
         return False
     
+    def _is_fvg_unmitigated(self, data: pd.DataFrame, fvg, fvg_end_idx: int, current_idx: int) -> bool:
+        """
+        Check if an FVG is unmitigated (hasn't been fully retraced).
+        
+        Args:
+            data: OHLCV data (M15 or H1)
+            fvg: FVG object
+            fvg_end_idx: Index where FVG formation completed
+            current_idx: Current candle index to check up to
+            
+        Returns:
+            True if FVG is unmitigated (hasn't been fully closed)
+        """
+        # Look at all candles from after FVG formation until current candle
+        for i in range(fvg_end_idx + 1, min(current_idx, len(data))):
+            candle_high = data.iloc[i]['high']
+            candle_low = data.iloc[i]['low']
+            
+            # Check if FVG has been fully mitigated
+            if fvg.fvg_type == 'bullish':
+                # Bullish FVG is mitigated if price closes below the bottom of the gap
+                if candle_low <= fvg.bottom:
+                    return False  # FVG is mitigated
+            elif fvg.fvg_type == 'bearish':
+                # Bearish FVG is mitigated if price closes above the top of the gap
+                if candle_high >= fvg.top:
+                    return False  # FVG is mitigated
+        
+        return True  # FVG is unmitigated
+    
     def get_description(self) -> str:
         """Return strategy description."""
-        return (f"FVG Strategy (M15 timeframe): H1 FVG context + M15 FVG confirmation, "
-                f"H1 lookback {self.h1_lookback_candles} candles, R:R ratio {self.risk_reward_ratio}:1, "
+        return (f"FVG Strategy (M15 timeframe): H4 unmitigated FVG + Daily open filter + M15 FVG confirmation, "
+                f"H4 lookback {self.h4_lookback_candles} candles, R:R ratio {self.risk_reward_ratio}:1, "
                 f"execution windows: London Open (03:00-04:00), NY Open (10:00-11:00), "
                 f"NY Afternoon (14:00-15:00) NY time. Position size: {self.position_size * 100}%.")
     
