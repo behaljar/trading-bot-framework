@@ -54,6 +54,7 @@ class StrategyWrapper(Strategy):
         
         # Convert backtesting.py data format to framework format
         # backtesting.py uses capitalized OHLCV, framework uses lowercase
+        # Normalized data should work fine for FVG detection - ratios are preserved
         self.framework_data = pd.DataFrame({
             'open': self.data.Open,
             'high': self.data.High,

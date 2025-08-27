@@ -7,6 +7,9 @@ This guide covers how to run backtests using the trading framework with the back
 ```bash
 # Basic backtest with SMA strategy
 uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+
+# Basic backtest with FVG strategy (requires M15 data)
+uv run python scripts/run_backtest.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 ```
 
 ## Basic Examples
@@ -40,6 +43,55 @@ uv run python scripts/run_backtest.py \
     --start 2024-01-01 \
     --end 2024-03-31
 ```
+
+## FVG Strategy Examples
+
+### Basic FVG Strategy
+```bash
+# Run FVG strategy with default parameters (requires M15 data)
+uv run python scripts/run_backtest.py \
+    --strategy fvg \
+    --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+    --symbol BTC_USDT
+```
+
+### Custom FVG Parameters
+```bash
+# Customize FVG strategy parameters
+STRATEGY_PARAMS='{"h1_lookback_candles": 24, "risk_reward_ratio": 3.0, "max_hold_hours": 4, "position_size": 0.05, "min_fvg_sensitivity": 0.15}' \
+uv run python scripts/run_backtest.py \
+    --strategy fvg \
+    --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+    --symbol BTC_USDT
+```
+
+### FVG with Conservative Risk Management
+```bash
+# Conservative FVG setup with 0.5% risk per trade
+STRATEGY_PARAMS='{"h1_lookback_candles": 36, "risk_reward_ratio": 2.0, "position_size": 0.05}' \
+RISK_PARAMS='{"risk_percent": 0.005, "default_stop_distance": 0.02}' \
+uv run python scripts/run_backtest.py \
+    --strategy fvg \
+    --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+    --symbol BTC_USDT \
+    --risk-manager fixed_risk
+```
+
+### FVG Strategy Parameters
+
+**Available FVG Strategy Parameters:**
+- `h1_lookback_candles`: Number of H1 candles to look back for FVG detection (default: 36)
+- `risk_reward_ratio`: Take profit ratio relative to stop loss distance (default: 2.0)
+- `max_hold_hours`: Maximum time to hold a position in hours (default: 2)
+- `min_fvg_sensitivity`: Minimum FVG sensitivity ratio for detection (default: 0.1)
+- `position_size`: Position size as fraction of equity when not using risk manager (default: 0.1)
+
+**Important Notes for FVG Strategy:**
+- **Requires M15 timeframe data** - the strategy will not generate signals on other timeframes
+- **Session-based trading** - only one trade per execution window (London Open, NY Open, NY Afternoon)
+- **Weekend filtering** - no trades on Saturday/Sunday
+- **Timezone-aware** - all execution windows are in NY timezone
+- **Multi-timeframe analysis** - uses H1 FVG context with M15 confirmation
 
 ## Risk Management
 
@@ -310,10 +362,25 @@ This example:
 ## Available Strategies
 
 ### Currently Implemented:
-- `sma` - Simple Moving Average Crossover
-  - Generates long/short signals based on MA crossovers
-  - Configurable periods, stop loss, and take profit
-  - Suitable for trending markets
+
+#### 1. `sma` - Simple Moving Average Crossover
+- Generates long/short signals based on MA crossovers
+- Configurable periods, stop loss, and take profit
+- Suitable for trending markets
+
+#### 2. `fvg` - Fair Value Gap Strategy (M15 Timeframe)
+- Advanced multi-timeframe strategy using H1 and M15 Fair Value Gaps
+- Operates on M15 data with H1 context for bias direction
+- Only trades during specific NY timezone execution windows
+- Session-based trading with one trade per window limit
+- **Key Features:**
+  - H1 FVG detection with 36-candle lookback (resampled from M15)
+  - M15 FVG confirmation in same direction as H1 bias
+  - Execution windows: London Open (03:00-04:00), NY Open (10:00-11:00), NY Afternoon (14:00-15:00) NY time
+  - No weekend trading
+  - Stop loss based on M15 FVG formation
+  - Configurable risk/reward ratio (default 2:1)
+  - Maximum 2-hour hold time
 
 ### Adding New Strategies:
 New strategies can be added by:
