@@ -3,7 +3,7 @@ FVG Strategy (M15 Timeframe with H4 Context)
 
 Multi-timeframe FVG strategy that:
 - Uses H4 unmitigated FVG context with M15 FVG confirmation
-- Only considers H4 FVGs from past 3 days
+- Only considers H4 FVGs from last 9 H4 candles
 - Requires price to touch unmitigated H4 FVG before M15 FVG signal
 - Only trades during specific execution windows in NY timezone
 - Daily open filter: Long above daily open, Short below daily open
@@ -11,7 +11,7 @@ Multi-timeframe FVG strategy that:
 - Excludes weekend trading
 
 Entry Conditions:
-1. H4 FVG formation within past 3 days that is UNMITIGATED
+1. H4 FVG formation within last 9 H4 candles that is UNMITIGATED
 2. Price must touch (wick into) the unmitigated H4 FVG
 3. Daily open filter: Long only if price above daily open, Short only if price below daily open
 4. M15 FVG detected in same direction as H4 FVG
@@ -383,7 +383,7 @@ class FVGStrategy(BaseStrategy):
     
     def _has_price_touched_h4_fvg(self, data: pd.DataFrame, h4_data: pd.DataFrame, h4_fvgs: list, current_idx: int, fvg_type: str) -> bool:
         """
-        Check if price has touched (wicked into) any H4 FVG of the same type from the past 3 days that is still unmitigated.
+        Check if price has touched (wicked into) any H4 FVG of the same type from the last 9 H4 candles before current M15 candle.
         
         Args:
             data: M15 OHLCV data
@@ -393,12 +393,9 @@ class FVGStrategy(BaseStrategy):
             fvg_type: 'bullish' or 'bearish'
             
         Returns:
-            True if price has touched an unmitigated H4 FVG of the same type within past 3 days
+            True if price has touched an H4 FVG of the same type within lookback period
         """
         current_time = data.index[current_idx]
-        
-        # Calculate 3 days ago from current time
-        three_days_ago = current_time - pd.Timedelta(days=3)
         
         # Find the H4 candle index that corresponds to current M15 time
         current_h4_idx = None
@@ -411,15 +408,18 @@ class FVGStrategy(BaseStrategy):
         if current_h4_idx is None:
             return False
         
-        # Find relevant H4 FVGs of the same type within past 3 days that are unmitigated
+        # Calculate lookback range - only consider H4 FVGs from last 9 H4 candles
+        lookback_start_idx = max(0, current_h4_idx - self.h4_lookback_candles + 1)
+        
+        # Find relevant H4 FVGs of the same type within lookback period that are unmitigated
         relevant_h4_fvgs = []
         for fvg in h4_fvgs:
             if (fvg.fvg_type == fvg_type and 
                 fvg.end_idx < len(h4_data) and
+                fvg.end_idx >= lookback_start_idx and
                 fvg.end_idx < current_h4_idx):
                 h4_fvg_end_time = h4_data.index[fvg.end_idx]
-                # Check if FVG was formed within past 3 days and before current time
-                if h4_fvg_end_time >= three_days_ago and h4_fvg_end_time < current_time:
+                if h4_fvg_end_time < current_time:
                     # Check if H4 FVG is unmitigated from its formation until current H4 candle
                     if self._is_fvg_unmitigated(h4_data, fvg, fvg.end_idx, current_h4_idx):
                         relevant_h4_fvgs.append((fvg, h4_fvg_end_time))
@@ -489,7 +489,7 @@ class FVGStrategy(BaseStrategy):
     def get_description(self) -> str:
         """Return strategy description."""
         return (f"FVG Strategy (M15 timeframe): H4 unmitigated FVG + Daily open filter + M15 FVG confirmation, "
-                f"H4 lookback past 3 days, R:R ratio {self.risk_reward_ratio}:1, "
+                f"H4 lookback {self.h4_lookback_candles} candles, R:R ratio {self.risk_reward_ratio}:1, "
                 f"execution windows: London Open (03:00-04:00), NY Open (10:00-11:00), "
                 f"NY Afternoon (14:00-15:00) NY time. Position size: {self.position_size * 100}%.")
     
