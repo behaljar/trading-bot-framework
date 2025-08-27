@@ -12,8 +12,8 @@ class SMAStrategy(BaseStrategy):
     """
     
     def __init__(self, short_window: int = 20, long_window: int = 50,
-                 position_size: float = 0.01, stop_loss_pct: float = None, 
-                 take_profit_pct: float = None, risk_manager=None):
+                 position_size: float = 0.01, stop_loss_pct: float = 0.02,
+                 take_profit_pct: float = 0.04):
         """
         Initialize the strategy.
         
@@ -23,7 +23,6 @@ class SMAStrategy(BaseStrategy):
             position_size: Fraction of portfolio to use for each trade (0.0 to 1.0)
             stop_loss_pct: Stop loss percentage (e.g., 0.02 for 2% stop loss)
             take_profit_pct: Take profit percentage (e.g., 0.04 for 4% take profit)
-            risk_manager: Risk manager instance for position sizing and stop-loss
         """
         parameters = {
             'short_window': short_window,
@@ -32,7 +31,7 @@ class SMAStrategy(BaseStrategy):
             'stop_loss_pct': stop_loss_pct,
             'take_profit_pct': take_profit_pct
         }
-        super().__init__("SMA", parameters, risk_manager)
+        super().__init__("SMA", parameters)
         
         self.short_window = short_window
         self.long_window = long_window
@@ -113,11 +112,6 @@ class SMAStrategy(BaseStrategy):
         
     def get_description(self) -> str:
         """Return strategy description."""
-        risk_desc = ""
-        if self.risk_manager is not None:
-            risk_metrics = self.risk_manager.get_risk_metrics()
-            risk_desc = f" Risk management: {risk_metrics.get('risk_management_type', 'Unknown')}"
-        
         sl_desc = ""
         if self.stop_loss_pct is not None:
             sl_desc = f" Stop loss: {self.stop_loss_pct * 100}%."
@@ -128,7 +122,7 @@ class SMAStrategy(BaseStrategy):
         
         return (f"Simple Moving Average Crossover Strategy with "
                 f"{self.short_window}-period short MA and {self.long_window}-period long MA. "
-                f"Position size: {self.position_size * 100}%.{sl_desc}{tp_desc}{risk_desc}")
+                f"Position size: {self.position_size * 100}%.{sl_desc}{tp_desc}")
     
     def get_strategy_name(self) -> str:
         """Return strategy name for identification."""

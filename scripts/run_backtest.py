@@ -88,6 +88,7 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
                 use_fractional: bool = True,
                 risk_manager_type: str = "fixed_position",
                 risk_manager_params: Dict[str, Any] = None,
+                margin: float = 0.01,
                 debug: bool = False) -> None:
     """Run backtest using backtesting.py with our framework strategies"""
     
@@ -133,8 +134,10 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
     # Create and run backtest
     print(f"\nRunning backtest with strategy: {strategy_name}")
     print(f"Strategy parameters: {strategy_params}")
+    print(f"Risk manager: {risk_manager.get_description()}")
     print(f"Initial capital: ${initial_capital:,.2f}")
     print(f"Commission: {commission:.3%}")
+    print(f"Leverage: {int(1/margin)}x (margin={margin:.2%})")
     
     # Choose backtest engine based on use_fractional parameter
     if use_fractional:
@@ -144,7 +147,8 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
             strategy=WrapperClass,
             cash=initial_capital,
             commission=commission,
-            exclusive_orders=True  # Only one order type active at a time
+            margin=margin,
+            exclusive_orders=True
         )
     else:
         bt = Backtest(
@@ -152,7 +156,8 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
             strategy=WrapperClass,
             cash=initial_capital,
             commission=commission,
-            exclusive_orders=True  # Only one order type active at a time
+            margin=margin,
+            exclusive_orders=True
         )
     
     # Run the backtest
@@ -266,6 +271,9 @@ def main():
                        help="Use standard Backtest instead of FractionalBacktest (not recommended for high-priced assets)")
     parser.add_argument("--debug", action="store_true",
                        help="Enable debug logging")
+    parser.add_argument("--risk-manager", type=str, default="fixed_risk",
+                       choices=['fixed_position', 'fixed_risk'],
+                       help="Risk manager type (default: fixed_risk)")
     
     args = parser.parse_args()
     
@@ -280,6 +288,12 @@ def main():
             strategy_params = json.loads(os.environ['STRATEGY_PARAMS'])
             logger.info(f"Loaded strategy parameters: {strategy_params}")
         
+        # Get risk manager parameters from environment variable
+        risk_manager_params = {}
+        if 'RISK_PARAMS' in os.environ:
+            risk_manager_params = json.loads(os.environ['RISK_PARAMS'])
+            logger.info(f"Loaded risk manager parameters: {risk_manager_params}")
+        
         # Load data
         data = load_data(args.data_file, args.start, args.end)
         
@@ -291,7 +305,11 @@ def main():
             symbol=args.symbol,
             initial_capital=args.initial_capital,
             commission=args.commission,
-            use_fractional=not args.use_standard
+            margin=0.01,
+            use_fractional=not args.use_standard,
+            risk_manager_type=args.risk_manager,
+            risk_manager_params=risk_manager_params,
+            debug=args.debug
         )
         
         logger.info("Backtest completed successfully")

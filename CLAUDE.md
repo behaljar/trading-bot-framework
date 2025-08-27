@@ -47,22 +47,52 @@ This is a comprehensive Python trading framework for algorithmic trading strateg
 
 ### Running Backtests
 
-**Backtest Engine (using backtesting.py library):**
+**Basic Examples:**
 ```bash
 # Basic backtest with SMA strategy
 uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
-# Backtest with stop loss and take profit
-STRATEGY_PARAMS='{"short_window": 10, "long_window": 20, "position_size": 0.5, "stop_loss_pct": 0.02, "take_profit_pct": 0.04}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2024-01-01 --end 2024-01-10
+# Backtest with custom strategy parameters
+STRATEGY_PARAMS='{"short_window": 10, "long_window": 20, "stop_loss_pct": 0.02, "take_profit_pct": 0.04}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
-# Backtest with higher initial capital for high-priced assets
-uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --initial-capital 100000 --commission 0.001
+# Backtest with date range
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2024-01-01 --end 2024-03-31
+```
 
-# Backtest with date range and debug logging
-uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2023-01-01 --end 2023-12-31 --debug
+**Risk Management Examples:**
+```bash
+# Fixed Risk Manager - Risk 1% of account on each trade (RECOMMENDED)
+RISK_PARAMS='{"risk_percent": 0.01, "default_stop_distance": 0.02}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --risk-manager fixed_risk
+
+# Fixed Risk Manager - Conservative 0.5% risk per trade
+RISK_PARAMS='{"risk_percent": 0.005, "default_stop_distance": 0.02}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --risk-manager fixed_risk
+
+# Fixed Position Size Manager - Use fixed 10% of equity (default)
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --risk-manager fixed_position
+
+# Fixed Position Size Manager - Small position for high leverage (0.1% of equity)
+RISK_PARAMS='{"position_size": 0.001}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --risk-manager fixed_position
+```
+
+**Advanced Options:**
+```bash
+# High initial capital for expensive assets
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --initial-capital 100000
+
+# Custom commission rate
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --commission 0.0005
+
+# Debug logging for troubleshooting
+uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --debug
 
 # Use standard backtest instead of fractional (not recommended for crypto)
 uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --use-standard
+```
+
+**Note on Leverage:**
+The backtest uses 100x leverage by default (margin=0.01). When using high leverage, adjust position sizes accordingly:
+- With FixedRiskManager: The manager automatically calculates safe position sizes based on stop loss distance
+- With FixedPositionSizeManager: Use smaller position sizes (e.g., 0.001 = 0.1% instead of 0.1 = 10%)
 ```
 
 ### Testing

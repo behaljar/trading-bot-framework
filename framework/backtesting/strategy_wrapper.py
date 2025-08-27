@@ -164,15 +164,6 @@ class StrategyWrapper(Strategy):
                 self.entry_price = current_price
                 self.stop_loss_price = stop_loss
                 self.take_profit_price = take_profit
-                
-                # Only log in debug mode
-                if self.__class__.debug:
-                    size_display = f"{position_size:.1%}" if position_size < 1 else f"{position_size:.0f} units"
-                    self.logger.debug(f"BUY (LONG) signal at ${current_price:.2f} (size: {size_display})")
-                    if stop_loss:
-                        self.logger.debug(f"Stop loss set at ${stop_loss:.2f}")
-                    if take_profit:
-                        self.logger.debug(f"Take profit set at ${take_profit:.2f}")
                     
         elif signal == -1:  # Sell/Short signal
             if not self.position:
@@ -184,15 +175,6 @@ class StrategyWrapper(Strategy):
                 # For short positions, stop loss is above entry, take profit is below
                 self.stop_loss_price = stop_loss
                 self.take_profit_price = take_profit
-                
-                # Only log in debug mode
-                if self.__class__.debug:
-                    size_display = f"{position_size:.1%}" if position_size < 1 else f"{position_size:.0f} units"
-                    self.logger.debug(f"SELL (SHORT) signal at ${current_price:.2f} (size: {size_display})")
-                    if stop_loss:
-                        self.logger.debug(f"Stop loss set at ${stop_loss:.2f}")
-                    if take_profit:
-                        self.logger.debug(f"Take profit set at ${take_profit:.2f}")
             
     def _reset_position_tracking(self):
         """Reset position tracking variables."""

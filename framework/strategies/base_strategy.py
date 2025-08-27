@@ -9,11 +9,9 @@ class BaseStrategy(ABC):
     All trading strategies should inherit from this class.
     """
     
-    def __init__(self, name: str, parameters: Optional[Dict[str, Any]] = None, 
-                 risk_manager=None):
+    def __init__(self, name: str, parameters: Optional[Dict[str, Any]] = None):
         self.name = name
         self.parameters = parameters or {}
-        self.risk_manager = risk_manager
         
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
