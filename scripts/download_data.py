@@ -8,6 +8,7 @@ Handles large date ranges by chunking requests and combining data.
 """
 
 import argparse
+import calendar
 import os
 import sys
 import time
@@ -56,7 +57,12 @@ def chunk_date_range(start_date, end_date, chunk_months=6):
             month = month - 12
             year += 1
             
-        chunk_end = datetime(year, month, current_start.day)
+        # Handle month end edge cases (e.g., Feb 29 doesn't exist in non-leap years)
+        # Use min of current day and last day of target month
+        last_day_of_month = calendar.monthrange(year, month)[1]
+        day = min(current_start.day, last_day_of_month)
+        
+        chunk_end = datetime(year, month, day)
         
         # Don't exceed the actual end date
         if chunk_end > end_dt:
