@@ -2,26 +2,25 @@
 """
 Walk-Forward Analysis Runner
 
-This script performs walk-forward analysis on trading strategies to validate
-their robustness across different time periods. It uses pre-optimized parameters
-to test strategy performance on rolling time windows.
+Performs walk-forward analysis using ManualGridSearchOptimizer for consistent
+parameter optimization across IS/OOS periods.
 
 Example usage:
     # Basic walk-forward analysis with SMA strategy
-    STRATEGY_PARAMS='{"short_window": 10, "long_window": 20}' python scripts/run_walk_forward.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+    PARAM_CONFIG='{"short_window": {"values": [10, 15, 20]}, "long_window": {"values": [30, 40, 50]}}' python scripts/run_walk_forward.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
     # Walk-forward with custom windows and risk management
-    STRATEGY_PARAMS='{"h1_lookback_candles": 24, "risk_reward_ratio": 3.0}' RISK_PARAMS='{"risk_percent": 0.01}' python scripts/run_walk_forward.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --test-window-months 3 --step-months 1 --risk-manager fixed_risk
+    PARAM_CONFIG='{"h1_lookback_candles": {"min": 20, "max": 28, "step": 2}, "risk_reward_ratio": {"choices": [2.5, 3.0, 3.5]}}' RISK_PARAMS='{"risk_percent": 0.01}' python scripts/run_walk_forward.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --is-window-months 3 --oos-window-months 1
 """
 
 import argparse
 import pandas as pd
-import numpy as np
 import os
 import sys
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 # Add framework to path
 script_dir = Path(__file__).parent
@@ -31,6 +30,7 @@ sys.path.append(str(framework_dir))
 from framework.utils.logger import setup_logger
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
+from framework.strategies.breakout_strategy import BreakoutStrategy
 from framework.optimization.walk_forward_analyzer import WalkForwardAnalyzer
 
 
@@ -65,153 +65,100 @@ def load_data(file_path: str, start_date: Optional[str] = None,
     return df
 
 
-def save_results(analysis_result, output_dir: Path, strategy_name: str, symbol: str):
-    """Save walk-forward analysis results to files."""
-    # Create timestamp for unique filenames
-    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    clean_symbol = symbol.replace('/', '_')
-    
-    # Save summary results to JSON
-    summary_file = output_dir / f"walk_forward_{strategy_name}_{clean_symbol}_{timestamp}_summary.json"
-    
-    summary_data = {
-        'analysis_summary': analysis_result.get_summary(),
-        'combined_metrics': analysis_result.combined_metrics,
-        'stability_metrics': analysis_result.stability_metrics,
-        'analysis_parameters': analysis_result.analysis_parameters,
-        'metadata': analysis_result.metadata
-    }
-    
-    # Convert datetime objects to strings for JSON serialization
-    def convert_datetime(obj):
-        if hasattr(obj, 'isoformat'):
-            return obj.isoformat()
-        elif isinstance(obj, (np.integer, np.floating)):
-            return float(obj)
-        return str(obj)
-    
-    with open(summary_file, 'w') as f:
-        json.dump(summary_data, f, indent=2, default=convert_datetime)
-    
-    print(f"Summary results saved to: {summary_file}")
-    
-    # Save detailed period results to CSV
-    try:
-        periods_df = analysis_result.to_dataframe()
-        if not periods_df.empty:
-            periods_file = output_dir / f"walk_forward_{strategy_name}_{clean_symbol}_{timestamp}_periods.csv"
-            periods_df.to_csv(periods_file, index=False)
-            print(f"Period-by-period results saved to: {periods_file}")
-    except Exception as e:
-        print(f"Could not save period results to CSV: {e}")
-
-
-def print_results_summary(analysis_result):
+def print_results_summary(result: Dict[str, Any]):
     """Print a formatted summary of walk-forward analysis results."""
+    summary = result['summary']
+    info = result['analysis_info']
+    
     print("\n" + "="*80)
-    print(f"WALK-FORWARD ANALYSIS RESULTS - {analysis_result.strategy_name}")
+    print(f"WALK-FORWARD ANALYSIS RESULTS - {info['strategy']}")
     print("="*80)
     
     # Print basic info
-    print(f"Symbol: {analysis_result.symbol}")
-    print(f"Analysis Period: {analysis_result.analysis_start_date.date()} to {analysis_result.analysis_end_date.date()}")
-    print(f"Total Test Periods: {len(analysis_result.individual_results)}")
-    print(f"Test Window: {analysis_result.analysis_parameters['test_window_months']} months")
-    print(f"Step Size: {analysis_result.analysis_parameters['step_months']} months")
+    print(f"Symbol: {info['symbol']}")
+    print(f"Total Periods: {info['total_periods']}")
+    print(f"IS Window: {info['is_window_months']} months, OOS Window: {info['oos_window_months']} months")
+    print(f"Window Mode: {info['window_mode']}, Step: {info['step_months']} months")
+    print(f"Optimization Metric: {info['optimization_metric']}")
     
-    # Print combined metrics
-    print("\nCOMBINED METRICS:")
-    print("-" * 40)
-    metrics = analysis_result.combined_metrics
-    
-    print(f"Average OOS Return:    {metrics.get('avg_return_pct', 0):.2f}%")
-    print(f"Median OOS Return:     {metrics.get('median_return_pct', 0):.2f}%")
-    print(f"OOS Return Std Dev:    {metrics.get('std_return_pct', 0):.2f}%")
-    print(f"Positive OOS Periods:  {metrics.get('positive_return_periods', 0)}/{metrics.get('total_periods', 0)} ({metrics.get('positive_return_pct', 0):.1f}%)")
-    print(f"Average Sharpe:        {metrics.get('avg_sharpe_ratio', 0):.3f}")
-    print(f"Average Max DD:        {metrics.get('avg_max_drawdown', 0):.2f}%")
-    print(f"Worst Max DD:          {metrics.get('worst_max_drawdown', 0):.2f}%")
-    print(f"Average Win Rate:      {metrics.get('avg_win_rate', 0):.2f}%")
-    print(f"Avg Trades/Period:     {metrics.get('avg_trades_per_period', 0):.1f}")
-    
-    # WFE specific metrics
+    # Print WFE metrics
     print("\nWALK-FORWARD EFFICIENCY (WFE):")
     print("-" * 40)
-    print(f"Average WFE:           {metrics.get('avg_wfe', 0):.1f}%")
-    print(f"Median WFE:            {metrics.get('median_wfe', 0):.1f}%")
-    print(f"WFE Std Dev:           {metrics.get('wfe_std', 0):.1f}%")
-    print(f"Positive WFE Periods:  {metrics.get('positive_wfe_periods', 0)}/{metrics.get('total_periods', 0)} ({metrics.get('positive_wfe_pct', 0):.1f}%)")
-    print(f"IS-OOS Correlation:    {metrics.get('is_oos_correlation', 0):.3f}")
-    print(f"Avg IS Return:         {metrics.get('avg_is_return_pct', 0):.2f}%")
-    print(f"Avg IS Annual Return:  {metrics.get('avg_is_annual_return_pct', 0):.2f}%")
-    print(f"Avg OOS Annual Return: {metrics.get('avg_oos_annual_return_pct', 0):.2f}%")
+    print(f"Average WFE:           {summary.get('avg_wfe', 0):.1f}%")
+    print(f"Median WFE:            {summary.get('median_wfe', 0):.1f}%")
+    print(f"WFE Std Dev:           {summary.get('std_wfe', 0):.1f}%")
+    print(f"Positive WFE Periods:  {summary.get('positive_wfe_periods', 0)}/{summary.get('total_periods', 0)} ({summary.get('positive_wfe_pct', 0):.1f}%)")
+    print(f"WFE Consistency:       {summary.get('wfe_consistency', 0):.3f}")
+    
+    # Print performance metrics
+    print("\nPERFORMANCE METRICS:")
+    print("-" * 40)
+    print(f"Avg IS Return:         {summary.get('avg_is_return_pct', 0):.2f}%")
+    print(f"Avg OOS Return:        {summary.get('avg_oos_return_pct', 0):.2f}%")
+    print(f"Median OOS Return:     {summary.get('median_oos_return_pct', 0):.2f}%")
+    print(f"OOS Return Std Dev:    {summary.get('std_oos_return_pct', 0):.2f}%")
+    print(f"Positive OOS Periods:  {summary.get('positive_oos_periods', 0)}/{summary.get('total_periods', 0)} ({summary.get('positive_oos_pct', 0):.1f}%)")
+    print(f"IS-OOS Correlation:    {summary.get('is_oos_correlation', 0):.3f}")
+    print(f"Avg IS Sharpe:         {summary.get('avg_is_sharpe', 0):.3f}")
+    print(f"Avg OOS Sharpe:        {summary.get('avg_oos_sharpe', 0):.3f}")
+    print(f"Avg IS Trades:         {summary.get('avg_is_trades', 0):.1f}")
+    print(f"Avg OOS Trades:        {summary.get('avg_oos_trades', 0):.1f}")
     
     # WFE Interpretation
-    avg_wfe = metrics.get('avg_wfe', 0)
+    avg_wfe = summary.get('avg_wfe', 0)
     if avg_wfe >= 100:
-        print(f"🟢 Excellent: Strategy maintains or improves performance out-of-sample")
+        print(f"\n🟢 Excellent: Strategy maintains or improves performance out-of-sample")
     elif avg_wfe >= 80:
-        print(f"🟡 Good: Strategy shows reasonable out-of-sample robustness")
+        print(f"\n🟡 Good: Strategy shows reasonable out-of-sample robustness")
     elif avg_wfe >= 60:
-        print(f"🟠 Moderate: Strategy shows some degradation out-of-sample")
+        print(f"\n🟠 Moderate: Strategy shows some degradation out-of-sample")
     else:
-        print(f"🔴 Poor: Strategy appears overfitted to training data")
-    
-    # Print stability metrics
-    if analysis_result.stability_metrics:
-        print("\nSTABILITY METRICS:")
-        print("-" * 40)
-        stability = analysis_result.stability_metrics
-        
-        print(f"Return Volatility:     {stability.get('return_pct_volatility', 0):.2f}%")
-        print(f"Return Consistency:    {stability.get('return_consistency', 0):.3f}")
-        print(f"Temporal Stability:    {stability.get('temporal_stability', 0):.3f}")
-        
-        if 'trend_consistency' in stability:
-            print(f"Trend Consistency:     {stability.get('trend_consistency', 0):.3f}")
+        print(f"\n🔴 Poor: Strategy appears overfitted to training data")
     
     # Show best and worst periods
-    best_periods = analysis_result.get_best_periods(3)
-    if best_periods:
-        print("\nTOP 3 PERFORMING PERIODS:")
+    periods = result['periods']
+    if periods:
+        periods_sorted = sorted(periods, key=lambda x: x['wfe_metrics']['oos_return_pct'], reverse=True)
+        
+        print("\nTOP 3 OOS PERFORMING PERIODS:")
         print("-" * 40)
-        for i, result in enumerate(best_periods, 1):
-            return_pct = getattr(result, 'Return [%]', getattr(result, 'return_pct', 0))
-            start_date = result.metadata.get('test_start', 'Unknown') if hasattr(result, 'metadata') else 'Unknown'
-            end_date = result.metadata.get('test_end', 'Unknown') if hasattr(result, 'metadata') else 'Unknown'
-            print(f"  {i}. {return_pct:.2f}% ({start_date} to {end_date})")
-    
-    worst_periods = analysis_result.get_worst_periods(3)
-    if worst_periods:
-        print("\nWORST 3 PERFORMING PERIODS:")
+        for i, period in enumerate(periods_sorted[:3], 1):
+            oos_return = period['wfe_metrics']['oos_return_pct']
+            wfe = period['wfe_metrics']['wfe']
+            start_date = period['oos_start'].strftime('%Y-%m-%d')
+            end_date = period['oos_end'].strftime('%Y-%m-%d')
+            print(f"  {i}. {oos_return:.2f}% OOS (WFE: {wfe:.0f}%) - {start_date} to {end_date}")
+        
+        print("\nWORST 3 OOS PERFORMING PERIODS:")
         print("-" * 40)
-        for i, result in enumerate(worst_periods, 1):
-            return_pct = getattr(result, 'Return [%]', getattr(result, 'return_pct', 0))
-            start_date = result.metadata.get('test_start', 'Unknown') if hasattr(result, 'metadata') else 'Unknown'
-            end_date = result.metadata.get('test_end', 'Unknown') if hasattr(result, 'metadata') else 'Unknown'
-            print(f"  {i}. {return_pct:.2f}% ({start_date} to {end_date})")
+        for i, period in enumerate(periods_sorted[-3:], 1):
+            oos_return = period['wfe_metrics']['oos_return_pct']
+            wfe = period['wfe_metrics']['wfe']
+            start_date = period['oos_start'].strftime('%Y-%m-%d')
+            end_date = period['oos_end'].strftime('%Y-%m-%d')
+            print(f"  {i}. {oos_return:.2f}% OOS (WFE: {wfe:.0f}%) - {start_date} to {end_date}")
 
 
 def main():
     """Main function for running walk-forward analysis."""
     parser = argparse.ArgumentParser(
-        description="Run walk-forward analysis on trading strategies",
+        description="Run walk-forward analysis using ManualGridSearchOptimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Basic walk-forward with SMA strategy
-  STRATEGY_PARAMS='{"short_window": 10, "long_window": 20}' python scripts/run_walk_forward.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+  PARAM_CONFIG='{"short_window": {"values": [10, 15, 20]}, "long_window": {"values": [30, 40, 50]}}' python scripts/run_walk_forward.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
-  # Walk-forward with FVG strategy and custom risk management
-  STRATEGY_PARAMS='{"h1_lookback_candles": 24}' RISK_PARAMS='{"risk_percent": 0.01}' python scripts/run_walk_forward.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --risk-manager fixed_risk
+  # Walk-forward with range parameters
+  PARAM_CONFIG='{"short_window": {"min": 8, "max": 12, "step": 2}, "long_window": {"min": 25, "max": 35, "step": 5}}' python scripts/run_walk_forward.py --strategy sma --data-file data.csv --symbol BTC_USDT
 
-  # Custom time windows
-  python scripts/run_walk_forward.py --strategy sma --data-file data.csv --symbol BTC_USDT --test-window-months 3 --step-months 1
+  # FVG strategy with custom risk management
+  PARAM_CONFIG='{"h1_lookback_candles": {"choices": [20, 24, 28]}, "risk_reward_ratio": {"choices": [2.5, 3.0, 3.5]}}' RISK_PARAMS='{"risk_percent": 0.01}' python scripts/run_walk_forward.py --strategy fvg --data-file data.csv --symbol BTC_USDT
         """
     )
     
     parser.add_argument("--strategy", type=str, required=True, 
-                       choices=['sma', 'fvg'],
+                       choices=['sma', 'fvg', 'breakout'],
                        help="Strategy to analyze")
     parser.add_argument("--data-file", type=str, required=True,
                        help="Path to CSV data file")
@@ -239,14 +186,12 @@ Examples:
     parser.add_argument("--risk-manager", type=str, default="fixed_risk",
                        choices=['fixed_position', 'fixed_risk'],
                        help="Risk manager type (default: fixed_risk)")
-    parser.add_argument("--use-standard", action="store_true",
-                       help="Use standard Backtest instead of FractionalBacktest")
-    parser.add_argument("--optimization-metric", type=str, default="Return [%]",
-                       choices=["Return [%]", "Sharpe Ratio", "Sortino Ratio"],
-                       help="Metric to optimize for (default: Return [%])")
+    parser.add_argument("--optimization-metric", type=str, default="return_pct",
+                       choices=["return_pct", "sharpe_ratio", "sortino_ratio"],
+                       help="Metric to optimize for (default: return_pct)")
     parser.add_argument("--minimize", action="store_true",
                        help="Minimize metric instead of maximize")
-    parser.add_argument("--n-jobs", type=int, default=None,
+    parser.add_argument("--n-jobs", type=int, default=-1,
                        help="Number of parallel jobs (default: auto-detect)")
     parser.add_argument("--debug", action="store_true",
                        help="Enable debug logging")
@@ -262,6 +207,7 @@ Examples:
         strategy_classes = {
             'sma': SMAStrategy,
             'fvg': FVGStrategy,
+            'breakout': BreakoutStrategy
         }
         
         if args.strategy not in strategy_classes:
@@ -269,27 +215,33 @@ Examples:
         
         strategy_class = strategy_classes[args.strategy]
         
-        # Get parameter space from environment variable
-        parameter_space = {}
-        if 'PARAMETER_SPACE' in os.environ:
-            parameter_space = json.loads(os.environ['PARAMETER_SPACE'])
-            logger.info(f"Loaded parameter space: {parameter_space}")
+        # Get parameter configuration from environment variable
+        parameter_config = {}
+        if 'PARAM_CONFIG' in os.environ:
+            parameter_config = json.loads(os.environ['PARAM_CONFIG'])
+            logger.info(f"Loaded parameter config: {parameter_config}")
         else:
-            # Use default parameter space for the strategy
+            # Use default parameter configs for the strategy
             if args.strategy == 'sma':
-                parameter_space = {
-                    'short_window': (5, 30),
-                    'long_window': (20, 100),
-                    'stop_loss_pct': [0.01, 0.02, 0.03],
-                    'take_profit_pct': [0.04, 0.06, 0.08]
+                parameter_config = {
+                    'short_window': {'min': 8, 'max': 20, 'step': 2, 'type': 'int'},
+                    'long_window': {'min': 25, 'max': 50, 'step': 5, 'type': 'int'},
+                    'stop_loss_pct': {'choices': [0.015, 0.02, 0.025]},
+                    'take_profit_pct': {'choices': [0.03, 0.04, 0.05]}
                 }
             elif args.strategy == 'fvg':
-                parameter_space = {
-                    'h1_lookback_candles': (12, 48),
-                    'risk_reward_ratio': [2.0, 2.5, 3.0, 3.5],
-                    'max_hold_hours': [2, 4, 6, 8]
+                parameter_config = {
+                    'h1_lookback_candles': {'choices': [20, 24, 28]},
+                    'risk_reward_ratio': {'choices': [2.5, 3.0, 3.5]},
+                    'max_hold_hours': {'choices': [3, 4, 5]}
                 }
-            logger.warning(f"No PARAMETER_SPACE environment variable found, using defaults: {parameter_space}")
+            elif args.strategy == 'breakout':
+                parameter_config = {
+                    'entry_lookback': {'min': 20, 'max': 40, 'step': 5, 'type': 'int'},
+                    'exit_lookback': {'min': 10, 'max': 20, 'step': 2, 'type': 'int'},
+                    'atr_multiplier': {'choices': [2.0, 2.5, 3.0]}
+                }
+            logger.warning(f"No PARAM_CONFIG environment variable found, using defaults: {parameter_config}")
         
         # Get risk manager parameters from environment variable
         risk_manager_params = {}
@@ -300,10 +252,15 @@ Examples:
         # Load data
         data = load_data(args.data_file, args.start, args.end)
         
+        # Create output directory with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        symbol_clean = args.symbol.replace('/', '_')
+        output_dir = f"output/walk_forward/{args.strategy}_{symbol_clean}_{timestamp}"
+        
         # Create walk-forward analyzer
         analyzer = WalkForwardAnalyzer(
             strategy_class=strategy_class,
-            parameter_space=parameter_space,
+            parameter_config=parameter_config,
             is_window_months=args.is_window_months,
             oos_window_months=args.oos_window_months,
             step_months=args.step_months,
@@ -313,11 +270,9 @@ Examples:
             margin=args.margin,
             risk_manager_type=args.risk_manager,
             risk_manager_params=risk_manager_params,
-            use_fractional=not args.use_standard,
             optimization_metric=args.optimization_metric,
             maximize=not args.minimize,
-            n_jobs=args.n_jobs,
-            generate_charts=True
+            n_jobs=args.n_jobs
         )
         
         print(f"\nStarting walk-forward analysis...")
@@ -327,19 +282,14 @@ Examples:
         print(f"Window Mode: {args.window_mode}")
         print(f"Step Size: {args.step_months} months")
         print(f"Risk Manager: {args.risk_manager}")
-        print(f"Generate Charts: {analyzer.generate_charts}")
+        print(f"Output Directory: {output_dir}")
         print(f"Parallel Jobs: {analyzer.n_jobs}")
         
         # Run walk-forward analysis
-        result = analyzer.analyze(data, args.symbol)
+        result = analyzer.analyze(data, args.symbol, output_dir)
         
         # Print results summary
         print_results_summary(result)
-        
-        # Save results to files
-        output_dir = Path("output/walk_forward")
-        output_dir.mkdir(exist_ok=True)
-        save_results(result, output_dir, args.strategy, args.symbol)
         
         logger.info("Walk-forward analysis completed successfully")
         

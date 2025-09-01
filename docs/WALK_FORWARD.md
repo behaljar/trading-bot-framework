@@ -1,15 +1,15 @@
 # Walk-Forward Analysis
 
-Walk-forward analysis is a robust validation technique that tests trading strategy robustness by optimizing parameters on in-sample (IS) data and then testing those optimized parameters on out-of-sample (OOS) data across rolling time windows. This methodology helps assess how well strategies generalize to unseen market conditions, identifies overfitting, and calculates Walk-Forward Efficiency (WFE) to measure the consistency of optimized parameters.
+Walk-forward analysis tests trading strategy robustness by optimizing parameters on in-sample (IS) data and testing on out-of-sample (OOS) data across rolling time windows. Uses ManualGridSearchOptimizer for consistent parameter optimization and calculates Walk-Forward Efficiency (WFE) to measure parameter robustness.
 
 ## Overview
 
 Walk-forward analysis differs from standard backtesting by:
-- Optimizing parameters on in-sample data for each period, then testing on out-of-sample data
+- Optimizing parameters on in-sample data for each period using ManualGridSearchOptimizer
+- Testing optimized parameters on out-of-sample data to validate robustness
 - Calculating Walk-Forward Efficiency (WFE) to measure optimization consistency
-- Measuring performance consistency and temporal stability across multiple periods
-- Identifying periods where the strategy performs well or poorly
-- Providing insights into strategy robustness across different market regimes
+- Providing insights into strategy performance across different market regimes
+- Creating separate directories for organized output
 
 ## Quick Start
 
@@ -17,15 +17,15 @@ Walk-forward analysis differs from standard backtesting by:
 
 ```bash
 # Simple walk-forward analysis with SMA strategy (3 months IS, 1 month OOS, rolling)
-PARAMETER_SPACE='{"short_window": [8, 10, 12], "long_window": [20, 25, 30]}' python scripts/run_walk_forward.py \
+PARAM_CONFIG='{"short_window": {"values": [8, 10, 12]}, "long_window": {"values": [20, 25, 30]}}' python scripts/run_walk_forward.py \
   --strategy sma \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
   --symbol BTC_USDT \
   --is-window-months 3 \
   --oos-window-months 1
 
-# FVG strategy with anchored mode (expanding IS window)
-PARAMETER_SPACE='{"h1_lookback_candles": [20, 24, 28], "risk_reward_ratio": [2.5, 3.0, 3.5]}' python scripts/run_walk_forward.py \
+# FVG strategy with range parameters
+PARAM_CONFIG='{"h1_lookback_candles": {"min": 20, "max": 28, "step": 2}, "risk_reward_ratio": {"choices": [2.5, 3.0, 3.5]}}' python scripts/run_walk_forward.py \
   --strategy fvg \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
   --symbol BTC_USDT \
@@ -37,24 +37,23 @@ PARAMETER_SPACE='{"h1_lookback_candles": [20, 24, 28], "risk_reward_ratio": [2.5
 ### Advanced Configuration
 
 ```bash
-# Rolling windows: 6 months IS, 2 months OOS, step by 1 month
-PARAMETER_SPACE='{"h1_lookback_candles": [20, 24, 28], "risk_reward_ratio": [2.5, 3.0, 3.5]}' \
+# Rolling windows with range parameters
+PARAM_CONFIG='{"short_window": {"min": 8, "max": 16, "step": 2, "type": "int"}, "long_window": {"min": 25, "max": 45, "step": 5, "type": "int"}}' \
 RISK_PARAMS='{"risk_percent": 0.01}' \
 python scripts/run_walk_forward.py \
-  --strategy fvg \
+  --strategy sma \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
   --symbol BTC_USDT \
   --is-window-months 6 \
   --oos-window-months 2 \
   --step-months 1 \
   --window-mode rolling \
-  --risk-manager fixed_risk \
   --initial-capital 50000 \
-  --optimization-metric "Sharpe Ratio"
+  --optimization-metric sharpe_ratio
 
-# Anchored windows: Start with 4 months IS, test on 1 month OOS, expand IS by 1 month each step
-PARAMETER_SPACE='{"short_window": [5, 8, 10], "long_window": [15, 20, 25]}' python scripts/run_walk_forward.py \
-  --strategy sma \
+# Anchored windows with choice parameters
+PARAM_CONFIG='{"h1_lookback_candles": {"choices": [20, 24, 28]}, "risk_reward_ratio": {"choices": [2.5, 3.0, 3.5]}}' python scripts/run_walk_forward.py \
+  --strategy fvg \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
   --symbol BTC_USDT \
   --is-window-months 4 \
@@ -65,27 +64,37 @@ PARAMETER_SPACE='{"short_window": [5, 8, 10], "long_window": [15, 20, 25]}' pyth
 
 ## Parameters
 
-### Parameter Optimization Space
+### Parameter Configuration
 
-Parameter optimization space is passed via the `PARAMETER_SPACE` environment variable as JSON. This defines the ranges of parameters to optimize during the in-sample periods:
+Parameter configuration is passed via the `PARAM_CONFIG` environment variable using the same format as the optimization script. This defines parameter ranges to optimize during in-sample periods:
+
+**Parameter Configuration Formats:**
+- `{"values": [val1, val2, val3]}` - Direct list of values
+- `{"choices": [val1, val2, val3]}` - Choice parameters (same as values)
+- `{"min": X, "max": Y, "step": Z, "type": "int|float"}` - Range parameters
 
 **SMA Strategy:**
 ```bash
-PARAMETER_SPACE='{"short_window": [8, 10, 12], "long_window": [20, 25, 30], "stop_loss_pct": [0.015, 0.02, 0.025], "take_profit_pct": [0.03, 0.04, 0.05]}'
+PARAM_CONFIG='{"short_window": {"min": 8, "max": 16, "step": 2, "type": "int"}, "long_window": {"values": [20, 25, 30]}, "stop_loss_pct": {"choices": [0.015, 0.02, 0.025]}}'
 ```
 
 **FVG Strategy:**
 ```bash
-PARAMETER_SPACE='{"h1_lookback_candles": [20, 24, 28], "risk_reward_ratio": [2.5, 3.0, 3.5], "max_hold_hours": [3, 4, 5]}'
+PARAM_CONFIG='{"h1_lookback_candles": {"choices": [20, 24, 28]}, "risk_reward_ratio": {"min": 2.0, "max": 3.5, "step": 0.5}, "max_hold_hours": {"values": [3, 4, 5]}}'
+```
+
+**Breakout Strategy:**
+```bash
+PARAM_CONFIG='{"entry_lookback": {"min": 20, "max": 40, "step": 5, "type": "int"}, "atr_multiplier": {"choices": [2.0, 2.5, 3.0]}}'
 ```
 
 ### Optimization Metrics
 
 You can specify which metric to optimize for during the in-sample periods:
 ```bash
---optimization-metric "Return [%]"     # Default: Total return percentage
---optimization-metric "Sharpe Ratio"   # Risk-adjusted return
---optimization-metric "Max Drawdown"   # Minimize maximum drawdown
+--optimization-metric return_pct        # Default: Total return percentage
+--optimization-metric sharpe_ratio      # Risk-adjusted return
+--optimization-metric sortino_ratio     # Downside risk-adjusted return
 ```
 
 ### Risk Management Parameters
@@ -132,24 +141,25 @@ RISK_PARAMS='{"position_size": 0.05}'
 python scripts/run_walk_forward.py [OPTIONS]
 
 Required:
-  --strategy {sma,fvg}           Strategy to analyze
-  --data-file PATH              Path to CSV data file
+  --strategy {sma,fvg,breakout}  Strategy to analyze
+  --data-file PATH               Path to CSV data file
   
 Optional:
-  --symbol TEXT                 Symbol identifier (default: UNKNOWN)
-  --start DATE                  Start date (YYYY-MM-DD)
-  --end DATE                    End date (YYYY-MM-DD)
-  --is-window-months INT        Months of in-sample data for optimization (default: 3)
-  --oos-window-months INT       Months of out-of-sample data for testing (default: 1)
-  --step-months INT             Months to step forward between periods (default: 1)
+  --symbol TEXT                  Symbol identifier (default: UNKNOWN)
+  --start DATE                   Start date (YYYY-MM-DD)
+  --end DATE                     End date (YYYY-MM-DD)
+  --is-window-months INT         Months of in-sample data for optimization (default: 3)
+  --oos-window-months INT        Months of out-of-sample data for testing (default: 1)
+  --step-months INT              Months to step forward between periods (default: 1)
   --window-mode {rolling,anchored}  Window mode (default: rolling)
-  --optimization-metric TEXT    Metric to optimize ('Return [%]', 'Sharpe Ratio', etc.)
-  --initial-capital FLOAT       Starting capital (default: 10000)
-  --commission FLOAT            Commission rate (default: 0.001)
-  --margin FLOAT                Margin requirement (default: 0.01 = 100x leverage)
+  --optimization-metric TEXT     Metric to optimize ('return_pct', 'sharpe_ratio', 'sortino_ratio')
+  --minimize                     Minimize metric instead of maximize
+  --initial-capital FLOAT        Starting capital (default: 10000)
+  --commission FLOAT             Commission rate (default: 0.001)
+  --margin FLOAT                 Margin requirement (default: 0.01 = 100x leverage)
   --risk-manager {fixed_position,fixed_risk}  Risk manager type (default: fixed_risk)
-  --use-standard                Use standard Backtest instead of FractionalBacktest
-  --debug                       Enable debug logging
+  --n-jobs INT                   Number of parallel jobs (default: auto-detect)
+  --debug                        Enable debug logging
 ```
 
 ## Output and Results
@@ -163,58 +173,57 @@ The script provides a comprehensive summary including:
 WALK-FORWARD ANALYSIS RESULTS - FVGStrategy
 ================================================================================
 Symbol: BTC_USDT
-Analysis Period: 2023-12-31 to 2025-08-20
-Total Test Periods: 5
-Test Window: 6 months
-Step Size: 3 months
-Optimization Metric: Return [%]
+Total Periods: 5
+IS Window: 6 months, OOS Window: 1 months
+Window Mode: rolling, Step: 1 months
+Optimization Metric: return_pct
 
-WALK-FORWARD EFFICIENCY:
+WALK-FORWARD EFFICIENCY (WFE):
 ----------------------------------------
 Average WFE:           45.2%
 Median WFE:            52.1%
-WFE Standard Dev:      28.3%
+WFE Std Dev:           28.3%
 Positive WFE Periods:  2/5 (40.0%)
-Best WFE:              78.9% (Period 3)
-Worst WFE:             12.4% (Period 1)
+WFE Consistency:       0.672
 
-COMBINED METRICS:
+PERFORMANCE METRICS:
 ----------------------------------------
-IS Average Return:     12.43%
-OOS Average Return:    5.62%
-IS Average Sharpe:     1.205
-OOS Average Sharpe:    0.687
-Average Max DD (IS):   -8.21%
-Average Max DD (OOS):  -11.48%
-Average Win Rate (IS): 52.3%
-Average Win Rate (OOS): 45.1%
-Avg Trades/Period:     35.4
+Avg IS Return:         12.43%
+Avg OOS Return:        5.62%
+Median OOS Return:     4.83%
+OOS Return Std Dev:    8.45%
+Positive OOS Periods:  3/5 (60.0%)
+IS-OOS Correlation:    0.423
+Avg IS Sharpe:         1.205
+Avg OOS Sharpe:        0.687
+Avg IS Trades:         45.2
+Avg OOS Trades:        12.8
 
-STABILITY METRICS:
-----------------------------------------
-Return Volatility:     2.64%
-Return Consistency:    2.131
-Temporal Stability:    0.672
-Trend Consistency:     0.451
+🟠 Moderate: Strategy shows some degradation out-of-sample
 
-TOP 3 PERFORMING PERIODS (by WFE):
+TOP 3 OOS PERFORMING PERIODS:
 ----------------------------------------
-  1. 78.9% WFE (IS: 15.2%, OOS: 12.0%) - Period 3
-  2. 65.3% WFE (IS: 18.1%, OOS: 11.8%) - Period 4
-  3. 52.1% WFE (IS: 9.8%, OOS: 5.1%) - Period 2
+  1. 12.0% OOS (WFE: 79%) - 2024-03-01 to 2024-03-31
+  2. 8.5% OOS (WFE: 65%) - 2024-06-01 to 2024-06-30
+  3. 3.2% OOS (WFE: 52%) - 2024-09-01 to 2024-09-30
 ```
 
 ### File Outputs
 
-Results are saved to `output/walk_forward/` directory:
+Results are saved to separate timestamped directories in `output/walk_forward/`:
 
-1. **Summary JSON** (`*_summary.json`): Complete analysis results with WFE metrics, IS/OOS performance, and metadata
-2. **Period Details CSV** (`*_periods.csv`): Period-by-period breakdown with IS/OOS metrics and optimal parameters
-3. **Charts** (`*_charts.png`): Comprehensive visualization including:
-   - IS vs OOS performance comparison
-   - Walk-Forward Efficiency distribution
-   - Performance correlation analysis
-   - Equity curves for each period
+**Directory Structure:**
+```
+output/walk_forward/sma_BTC_USDT_20250901_143022/
+├── walk_forward_periods_BTC_USDT.csv         # Period-by-period results
+├── walk_forward_summary_BTC_USDT.json        # Summary metrics and analysis
+└── walk_forward_analysis_BTC_USDT.png        # WFE visualization charts
+```
+
+**File Contents:**
+1. **Period CSV**: Period-by-period data with IS/OOS metrics, WFE, and optimal parameters
+2. **Summary JSON**: Complete analysis metrics, WFE statistics, and configuration parameters
+3. **Analysis Chart**: 2x2 visualization with IS vs OOS performance, WFE by period, correlation analysis, and summary statistics
 
 ## Interpreting Results
 
