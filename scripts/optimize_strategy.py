@@ -2,7 +2,7 @@
 """
 Strategy Optimization Script
 
-Run grid search optimization on trading strategies to find optimal parameters.
+Simple wrapper for the manual grid search optimizer.
 """
 
 import argparse
@@ -11,15 +11,14 @@ import sys
 from pathlib import Path
 import json
 import os
+from datetime import datetime
 
 # Add framework to path
 script_dir = Path(__file__).parent
 framework_dir = script_dir.parent
 sys.path.append(str(framework_dir))
 
-from framework.optimization.simple_grid_search import SimpleGridSearchOptimizer
-from framework.optimization.parallel_grid_search import ParallelGridSearchOptimizer
-from framework.optimization.parameter_space import ParameterSpace
+from framework.optimization.manual_grid_search import ManualGridSearchOptimizer
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
@@ -28,186 +27,31 @@ from framework.risk.fixed_risk_manager import FixedRiskManager
 from framework.utils.logger import setup_logger
 
 
-def parse_custom_parameter_space(param_space_arg: str) -> ParameterSpace:
-    """
-    Parse custom parameter space from JSON string or environment variable.
-    
-    Args:
-        param_space_arg: JSON string or environment variable name
-        
-    Returns:
-        ParameterSpace object
-        
-    Example JSON format:
-    {
-        "short_window": {"type": "int", "min": 5, "max": 50, "step": 5},
-        "long_window": {"type": "int", "min": 20, "max": 200, "step": 10},
-        "stop_loss_pct": {"type": "float", "min": 0.01, "max": 0.05, "step": 0.01},
-        "strategy_type": {"type": "choice", "choices": ["aggressive", "conservative"]}
+def get_default_param_config(strategy: str) -> dict:
+    """Get default parameter configuration for each strategy."""
+    configs = {
+        'sma': {
+            'short_window': {'type': 'int', 'min': 5, 'max': 50, 'step': 5},
+            'long_window': {'type': 'int', 'min': 20, 'max': 200, 'step': 20},
+            'stop_loss_pct': {'type': 'float', 'min': 0.01, 'max': 0.05, 'step': 0.01},
+            'take_profit_pct': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02}
+        },
+        'fvg': {
+            'h1_lookback_candles': {'type': 'int', 'min': 12, 'max': 48, 'step': 12},
+            'risk_reward_ratio': {'type': 'float', 'min': 1.5, 'max': 4.0, 'step': 0.5},
+            'max_hold_hours': {'type': 'int', 'min': 2, 'max': 8, 'step': 2},
+            'position_size': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02}
+        },
+        'breakout': {
+            'entry_lookback': {'type': 'int', 'min': 15, 'max': 60, 'step': 15},
+            'exit_lookback': {'type': 'int', 'min': 5, 'max': 30, 'step': 5},
+            'atr_multiplier': {'type': 'float', 'min': 1.0, 'max': 3.5, 'step': 0.5},
+            'medium_trend_threshold': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02},
+            'relative_volume_threshold': {'type': 'float', 'min': 1.2, 'max': 3.0, 'step': 0.4},
+            'cooldown_periods': {'type': 'int', 'min': 2, 'max': 20, 'step': 6}
+        }
     }
-    """
-    # Try to parse as JSON first
-    try:
-        param_config = json.loads(param_space_arg)
-    except json.JSONDecodeError:
-        # Try as environment variable
-        env_value = os.getenv(param_space_arg)
-        if env_value is None:
-            raise ValueError(f"Invalid JSON and environment variable '{param_space_arg}' not found")
-        try:
-            param_config = json.loads(env_value)
-        except json.JSONDecodeError:
-            raise ValueError(f"Environment variable '{param_space_arg}' does not contain valid JSON")
-    
-    # Create parameter space from config
-    space = ParameterSpace()
-    
-    for param_name, config in param_config.items():
-        param_type = config.get('type', 'float')
-        
-        if param_type == 'choice':
-            choices = config.get('choices')
-            if not choices:
-                raise ValueError(f"Parameter '{param_name}' of type 'choice' must have 'choices' defined")
-            space.add_parameter(param_name, param_type='choice', choices=choices)
-            
-        elif param_type in ['int', 'float']:
-            min_val = config.get('min')
-            max_val = config.get('max')
-            step = config.get('step')
-            
-            if min_val is None or max_val is None:
-                raise ValueError(f"Parameter '{param_name}' must have 'min' and 'max' values")
-            
-            space.add_parameter(
-                param_name,
-                min_value=min_val,
-                max_value=max_val,
-                step=step,
-                param_type=param_type
-            )
-        else:
-            raise ValueError(f"Unknown parameter type '{param_type}' for parameter '{param_name}'")
-    
-    return space
-
-
-def create_sma_parameter_space(args) -> ParameterSpace:
-    """Create parameter space for SMA strategy."""
-    space = ParameterSpace()
-    
-    # Window parameters
-    space.add_parameter('short_window', 
-                       min_value=5, 
-                       max_value=50, 
-                       step=5, 
-                       param_type='int')
-    
-    space.add_parameter('long_window',
-                       min_value=20,
-                       max_value=200, 
-                       step=20,
-                       param_type='int')
-    
-    # Risk parameters
-    if args.optimize_risk:
-        space.add_parameter('stop_loss_pct',
-                           min_value=0.01,
-                           max_value=0.05,
-                           step=0.01,
-                           param_type='float')
-        
-        space.add_parameter('take_profit_pct',
-                           min_value=0.02,
-                           max_value=0.10,
-                           step=0.02,
-                           param_type='float')
-    
-    return space
-
-
-def create_fvg_parameter_space(args) -> ParameterSpace:
-    """Create parameter space for FVG strategy."""
-    space = ParameterSpace()
-    
-    # H1 lookback
-    space.add_parameter('h1_lookback_candles',
-                       min_value=12,
-                       max_value=48,
-                       step=12,
-                       param_type='int')
-    
-    # Risk reward ratio
-    space.add_parameter('risk_reward_ratio',
-                       min_value=1.5,
-                       max_value=4.0,
-                       step=0.5,
-                       param_type='float')
-    
-    # Max hold hours
-    space.add_parameter('max_hold_hours',
-                       min_value=2,
-                       max_value=8,
-                       step=2,
-                       param_type='int')
-    
-    # Position size (if not using risk manager)
-    if not args.risk_manager or args.risk_manager == 'fixed_position':
-        space.add_parameter('position_size',
-                           min_value=0.02,
-                           max_value=0.10,
-                           step=0.02,
-                           param_type='float')
-    
-    return space
-
-
-def create_breakout_parameter_space(args) -> ParameterSpace:
-    """Create parameter space for Breakout strategy."""
-    space = ParameterSpace()
-    
-    # Lookback periods
-    space.add_parameter('entry_lookback',
-                       min_value=15,
-                       max_value=60,
-                       step=15,
-                       param_type='int')
-    
-    space.add_parameter('exit_lookback',
-                       min_value=5,
-                       max_value=30,
-                       step=5,
-                       param_type='int')
-    
-    # ATR parameters
-    space.add_parameter('atr_multiplier',
-                       min_value=1.0,
-                       max_value=3.5,
-                       step=0.5,
-                       param_type='float')
-    
-    # Trend filter parameters
-    space.add_parameter('medium_trend_threshold',
-                       min_value=0.02,
-                       max_value=0.10,
-                       step=0.02,
-                       param_type='float')
-    
-    # Volume filter parameters
-    space.add_parameter('relative_volume_threshold',
-                       min_value=1.2,
-                       max_value=3.0,
-                       step=0.4,
-                       param_type='float')
-    
-    # Cooldown periods
-    space.add_parameter('cooldown_periods',
-                       min_value=2,
-                       max_value=20,
-                       step=6,
-                       param_type='int')
-    
-    return space
+    return configs.get(strategy, {})
 
 
 def load_data(file_path: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
@@ -249,21 +93,19 @@ def main():
                        help='End date (YYYY-MM-DD)')
     
     # Optimization parameters
-    parser.add_argument('--metric', type=str, default='Return [%]',
-                       choices=['Return [%]', 'Sharpe Ratio', 'Win Rate [%]', 
-                               'Max. Drawdown [%]', 'Profit Factor'],
-                       help='Metric to optimize')
+    parser.add_argument('--metric', type=str, default='win_rate',
+                       choices=['return_pct', 'sharpe_ratio', 'win_rate', 
+                               'max_drawdown', 'profit_factor', 'calmar_ratio'],
+                       help='Metric to optimize and visualize')
     parser.add_argument('--minimize', action='store_true',
                        help='Minimize the metric instead of maximizing')
-    parser.add_argument('--param-space', type=str,
-                       help='Custom parameter space as JSON string or environment variable name')
+    parser.add_argument('--param-config', type=str,
+                       help='Custom parameter configuration as JSON string or file path')
     
     # Risk management
     parser.add_argument('--risk-manager', type=str,
                        choices=['fixed_position', 'fixed_risk'],
                        help='Risk manager type')
-    parser.add_argument('--optimize-risk', action='store_true',
-                       help='Include risk parameters in optimization')
     
     # Backtest parameters
     parser.add_argument('--initial-capital', type=float, default=10000,
@@ -273,15 +115,13 @@ def main():
     parser.add_argument('--margin', type=float, default=0.01,
                        help='Margin requirement (0.01 = 100x leverage)')
     
-    # Performance options
+    # Performance
     parser.add_argument('--n-jobs', type=int, default=-1,
-                       help='Number of parallel jobs (-1 = all cores, 1 = sequential)')
-    parser.add_argument('--use-simple', action='store_true',
-                       help='Use simple sequential optimizer instead of parallel')
+                       help='Number of parallel jobs (-1 = all cores)')
     
     # Output
     parser.add_argument('--output', type=str,
-                       help='Output file for results (JSON, default: auto-generated in output/optimizations/)')
+                       help='Output base path for results (default: auto-generated)')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug output')
     
@@ -293,129 +133,103 @@ def main():
     # Load data
     data = load_data(args.data_file, args.start, args.end)
     
-    # Create parameter space
-    if args.param_space:
-        # Use custom parameter space from JSON/environment variable
-        param_space = parse_custom_parameter_space(args.param_space)
-        logger.info("Using custom parameter space from JSON")
-    else:
-        # Use default parameter space based on strategy
-        if args.strategy == 'sma':
-            param_space = create_sma_parameter_space(args)
-        elif args.strategy == 'fvg':
-            param_space = create_fvg_parameter_space(args)
-        elif args.strategy == 'breakout':
-            param_space = create_breakout_parameter_space(args)
+    # Get parameter configuration
+    if args.param_config:
+        # Try to load from file or parse as JSON
+        if os.path.exists(args.param_config):
+            with open(args.param_config, 'r') as f:
+                param_config = json.load(f)
         else:
-            raise ValueError(f"Unknown strategy: {args.strategy}")
-        logger.info(f"Using default parameter space for {args.strategy}")
+            try:
+                param_config = json.loads(args.param_config)
+            except json.JSONDecodeError:
+                # Try as environment variable
+                env_value = os.getenv(args.param_config)
+                if env_value:
+                    param_config = json.loads(env_value)
+                else:
+                    raise ValueError(f"Invalid parameter configuration: {args.param_config}")
+    else:
+        param_config = get_default_param_config(args.strategy)
+    
+    print(f"\nParameter configuration: {json.dumps(param_config, indent=2)}")
     
     # Get strategy class
-    if args.strategy == 'sma':
-        strategy_class = SMAStrategy
-    elif args.strategy == 'fvg':
-        strategy_class = FVGStrategy
-    elif args.strategy == 'breakout':
-        strategy_class = BreakoutStrategy
-    else:
-        raise ValueError(f"Unknown strategy: {args.strategy}")
+    strategy_map = {
+        'sma': SMAStrategy,
+        'fvg': FVGStrategy,
+        'breakout': BreakoutStrategy
+    }
+    strategy_class = strategy_map[args.strategy]
     
-    # Create risk manager if specified
-    risk_manager = None
+    # Create risk manager (default to fixed_risk if not specified)
     if args.risk_manager == 'fixed_position':
         risk_manager = FixedPositionSizeManager(position_size=0.05)
-    elif args.risk_manager == 'fixed_risk':
+    else:
+        # Default to fixed_risk (even if None or 'fixed_risk' specified)
         risk_manager = FixedRiskManager(risk_percent=0.01)
     
-    # Log parameter space
-    logger.info(f"Parameter space: {param_space.get_total_combinations()} combinations")
-    logger.info(str(param_space))
+    # Create optimizer
+    optimizer = ManualGridSearchOptimizer(
+        strategy_class=strategy_class,
+        parameter_config=param_config,
+        data=data,
+        initial_capital=args.initial_capital,
+        commission=args.commission,
+        margin=args.margin,
+        risk_manager=risk_manager,
+        n_jobs=args.n_jobs,
+        debug=args.debug
+    )
     
-    # Create optimizer - choose between parallel and simple based on options
-    if args.use_simple or args.n_jobs == 1:
-        # Use simple sequential optimizer
-        optimizer = SimpleGridSearchOptimizer(
-            strategy_class=strategy_class,
-            parameter_space=param_space,
-            data=data,
-            initial_capital=args.initial_capital,
-            commission=args.commission,
-            margin=args.margin,
-            risk_manager=risk_manager,
-            n_jobs=1,
-            debug=args.debug
-        )
-        logger.info("Using SimpleGridSearchOptimizer (sequential)")
-    else:
-        # Use parallel optimizer for better performance
-        optimizer = ParallelGridSearchOptimizer(
-            strategy_class=strategy_class,
-            parameter_space=param_space,
-            data=data,
-            initial_capital=args.initial_capital,
-            commission=args.commission,
-            margin=args.margin,
-            risk_manager=risk_manager,
-            optimize_metric=args.metric,
-            maximize=not args.minimize,
-            n_jobs=args.n_jobs,
-            debug=args.debug
-        )
-        logger.info(f"Using ParallelGridSearchOptimizer ({args.n_jobs} jobs)")
+    print(f"\nGenerated {len(optimizer.combinations)} parameter combinations")
     
     # Run optimization
-    logger.info("Starting optimization...")
-    results = optimizer.optimize()
+    results_df = optimizer.optimize(metric=args.metric, maximize=not args.minimize)
     
-    # Display results
-    print("\n" + "=" * 60)
-    print("OPTIMIZATION RESULTS")
-    print("=" * 60)
-    print(f"Best {args.metric}: {results['metric_value']:.4f}")
-    print("\nBest Parameters:")
-    for param, value in results['best_params'].items():
-        print(f"  {param}: {value}")
-    
-    print("\nPerformance Metrics:")
-    for metric, value in results['best_stats'].items():
-        if value is not None:
-            print(f"  {metric}: {value}")
+    # Generate output path with separate directory for each run
+    if args.output:
+        output_base = args.output
+    else:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        data_file_name = Path(args.data_file).stem
+        parts = data_file_name.split('_')
+        symbol = f"{parts[0]}_{parts[1]}" if len(parts) >= 2 else "unknown"
+        
+        # Create directory for this optimization run
+        run_dir = f"output/optimizations/{args.strategy}_{symbol}_{timestamp}"
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
+        output_base = f"{run_dir}/results"
     
     # Save results
-    if args.output:
-        output_path = args.output
-    else:
-        # Generate default output path with backtest-like naming
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # Extract symbol from data file path if possible
-        data_file_name = Path(args.data_file).stem
-        if '_' in data_file_name:
-            # Try to extract symbol from filename like "BTC_USDT_binance_15m_..."
-            parts = data_file_name.split('_')
-            if len(parts) >= 2:
-                symbol = f"{parts[0]}_{parts[1]}"
-            else:
-                symbol = "unknown"
-        else:
-            symbol = "unknown"
-        
-        output_path = f"output/optimizations/{args.strategy}_{symbol}_{timestamp}_optimization.json"
+    optimizer.save_results(results_df, output_base)
     
-    optimizer.save_results(output_path, results, save_heatmap=True)
-    print(f"\nResults saved to: {output_path}")
+    # Create visualizations
+    optimizer.create_visualization(results_df, output_base, args.metric)
     
-    # Print CSV path
-    csv_path = Path(output_path).with_suffix('.csv')
-    print(f"All results saved to: {csv_path}")
+    # Print top results
+    print("\n" + "=" * 80)
+    print("TOP 10 RESULTS")
+    print("=" * 80)
     
-    # Also print chart paths if they were generated
-    if len(param_space.parameters) == 2:
-        heatmap_path = Path(output_path).with_suffix('.png')
-        print(f"Heatmap saved to: {heatmap_path}")
-    elif len(param_space.parameters) > 2:
-        charts_base = Path(output_path).with_suffix('')
-        print(f"Charts saved to: {charts_base}_*.png and {charts_base}_*.pdf")
+    top_10 = results_df.head(10)
+    param_cols = [col for col in results_df.columns if col not in 
+                  ['return_pct', 'sharpe_ratio', 'max_drawdown', 'win_rate', 
+                   'num_trades', 'exposure_time', 'profit_factor', 'avg_trade',
+                   'best_trade', 'worst_trade', 'calmar_ratio', 'sortino_ratio', 'error']]
+    
+    for idx, (i, row) in enumerate(top_10.iterrows(), 1):
+        print(f"\n#{idx}")
+        print("Parameters:")
+        for col in param_cols:
+            print(f"  {col}: {row[col]}")
+        print("Metrics:")
+        print(f"  Return: {row['return_pct']:.2f}%")
+        print(f"  Sharpe Ratio: {row['sharpe_ratio']:.2f}")
+        print(f"  Win Rate: {row['win_rate']:.2f}%")
+        print(f"  Max Drawdown: {row['max_drawdown']:.2f}%")
+        print(f"  Profit Factor: {row['profit_factor']:.2f}")
+        print(f"  Num Trades: {row['num_trades']}")
 
 
 if __name__ == '__main__':

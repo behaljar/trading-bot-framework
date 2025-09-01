@@ -185,3 +185,27 @@ The test suite includes:
 - Data integrity checks
 
 Test outputs including charts are saved to `output/tests/` directory.
+
+## Development Guidelines
+
+### Documentation
+- All new documentation files must be created in the `docs/` folder only
+- Do not create duplicate documentation in the root directory
+- Keep documentation organized and up-to-date
+
+### Script Development
+- Do not create new scripts for every feature
+- Extend existing scripts or framework modules instead
+- Keep the framework simple and uncluttered while maintaining full functionality
+- Minimize the number of scripts to maintain clean project structure
+
+### Code Organization
+- Prefer extending existing modules over creating new ones
+- Keep the codebase streamlined and professional
+- All heavy logic should be in framework modules, scripts should be simple wrappers
+
+### Framework Rules
+- All new documentation files must be created in the `docs/` folder only
+- Do not create new scripts for every feature - extend existing ones
+- Keep the framework simple and uncluttered while maintaining full functionality
+- Minimize script count to maintain clean project structure

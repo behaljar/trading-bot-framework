@@ -1,389 +1,473 @@
 # Strategy Optimization Guide
 
-This guide covers how to optimize trading strategy parameters using the grid search optimizer framework.
+This document explains how to use the strategy optimization system to find optimal trading parameters through systematic backtesting.
 
 ## Overview
 
-The optimization framework allows you to systematically test different parameter combinations to find the best performing configuration for your trading strategies. It generates detailed results with performance metrics and heatmap visualizations.
+The optimization system performs grid search over strategy parameters, running parallel backtests to find the best parameter combinations based on various performance metrics. It provides comprehensive visualization and detailed results export.
 
 ## Quick Start
 
-### Basic Optimization
-
+Basic optimization command:
 ```bash
-# Optimize SMA strategy with default parameters
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --start 2024-01-01 --end 2024-03-01
-
-# Optimize FVG strategy
-python scripts/optimize_strategy.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --start 2024-01-01 --end 2024-03-01
-
-# Custom parameter space via JSON
-python scripts/optimize_strategy.py --strategy sma --data-file data/file.csv --param-space '{"short_window": {"type": "int", "min": 5, "max": 20, "step": 5}, "long_window": {"type": "int", "min": 30, "max": 100, "step": 10}}'
-```
-
-## Strategy-Specific Optimization
-
-### SMA Strategy Optimization
-
-The SMA strategy optimizes moving average windows and optionally risk parameters.
-
-**Default Parameter Space:**
-- `short_window`: 5-50 (step: 5) - Short moving average period
-- `long_window`: 20-200 (step: 20) - Long moving average period
-
-**Basic Examples:**
-```bash
-# Standard SMA optimization (uses all CPU cores by default)
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --start 2024-01-01 --end 2024-06-01
-
-# Optimize with specific number of parallel jobs
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --n-jobs 4 --start 2024-01-01 --end 2024-06-01
-
-# Use sequential processing for debugging
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --use-simple --start 2024-01-01 --end 2024-06-01
-
-# Optimize with risk parameters included
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --optimize-risk --start 2024-01-01 --end 2024-06-01
-
-# Optimize for Sharpe ratio instead of returns
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --metric "Sharpe Ratio" --start 2024-01-01 --end 2024-06-01
-
-# Use fixed risk manager
-python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --risk-manager fixed_risk --start 2024-01-01 --end 2024-06-01
-```
-
-**Risk Parameter Optimization:**
-When using `--optimize-risk`, additional parameters are included:
-- `stop_loss_pct`: 1-5% (step: 1%)
-- `take_profit_pct`: 2-10% (step: 2%)
-
-### FVG Strategy Optimization
-
-The FVG (Fair Value Gap) strategy optimizes multi-timeframe parameters and risk settings.
-
-**Default Parameter Space:**
-- `h1_lookback_candles`: 12-48 (step: 12) - H1 context lookback period
-- `risk_reward_ratio`: 1.5-4.0 (step: 0.5) - Risk/reward ratio for trades
-- `max_hold_hours`: 2-8 (step: 2) - Maximum holding time
-- `position_size`: 2-10% (step: 2%) - Position size (if using fixed position manager)
-
-**Basic Examples:**
-```bash
-# Standard FVG optimization
-python scripts/optimize_strategy.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --start 2024-01-01 --end 2024-06-01
-
-# Optimize with fixed risk manager (excludes position_size from optimization)
-python scripts/optimize_strategy.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --risk-manager fixed_risk --start 2024-01-01 --end 2024-06-01
-
-# Optimize for win rate
-python scripts/optimize_strategy.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --metric "Win Rate [%]" --start 2024-01-01 --end 2024-06-01
-
-# High capital for expensive assets
-python scripts/optimize_strategy.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --initial-capital 100000 --start 2024-01-01 --end 2024-06-01
+python scripts/optimize_strategy.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --metric win_rate
 ```
 
 ## Command Line Options
 
-### Required Parameters
-- `--strategy`: Strategy to optimize (`sma`, `fvg`)
+### Required Arguments
+
+- `--strategy`: Strategy to optimize (`sma`, `fvg`, `breakout`)
 - `--data-file`: Path to CSV data file with OHLCV data
 
-### Data Selection
-- `--start`: Start date for optimization (YYYY-MM-DD)
-- `--end`: End date for optimization (YYYY-MM-DD)
+### Data Options
 
-### Optimization Settings
-- `--metric`: Metric to optimize (default: `Return [%]`)
-  - Available: `Return [%]`, `Sharpe Ratio`, `Win Rate [%]`, `Max. Drawdown [%]`, `Profit Factor`
+- `--start`: Start date for optimization period (YYYY-MM-DD)
+- `--end`: End date for optimization period (YYYY-MM-DD)
+
+### Optimization Parameters
+
+- `--metric`: Metric to optimize (default: `win_rate`)
+  - `return_pct`: Total return percentage
+  - `sharpe_ratio`: Risk-adjusted return metric
+  - `win_rate`: Percentage of winning trades
+  - `max_drawdown`: Maximum peak-to-trough decline
+  - `profit_factor`: Gross profit / gross loss ratio
+  - `calmar_ratio`: Return / max drawdown ratio
 - `--minimize`: Minimize the metric instead of maximizing (useful for drawdown)
-- `--optimize-risk`: Include risk parameters in optimization (SMA only)
-- `--param-space`: Custom parameter space as JSON string or environment variable name
+- `--param-config`: Custom parameter configuration (JSON string or file path)
 
 ### Risk Management
-- `--risk-manager`: Risk manager type
-  - `fixed_position`: Fixed percentage of equity per trade
-  - `fixed_risk`: Fixed percentage risk per trade based on stop loss
-- Risk manager parameters are set via environment variables (see examples below)
+
+- `--risk-manager`: Risk management type (default: `fixed_risk`)
+  - `fixed_position`: Fixed position size (5% of equity)
+  - `fixed_risk`: Fixed risk per trade (1% of equity) **[DEFAULT]**
 
 ### Backtest Settings
+
 - `--initial-capital`: Starting capital (default: 10000)
-- `--commission`: Commission rate per trade (default: 0.001)
-- `--margin`: Margin requirement - 0.01 = 100x leverage (default: 0.01)
+- `--commission`: Commission rate (default: 0.001 = 0.1%)
+- `--margin`: Margin requirement (default: 0.01 = 100x leverage)
 
 ### Performance Options
-- `--n-jobs`: Number of parallel jobs (default: -1 = all CPU cores)
-- `--use-simple`: Force sequential optimizer instead of parallel
 
-### Output
-- `--output`: Custom output file path (default: auto-generated timestamp)
+- `--n-jobs`: Number of parallel workers (default: -1 = all CPU cores)
 - `--debug`: Enable debug logging
 
-## Risk Manager Configuration
+### Output Options
 
-### Fixed Position Size Manager
-```bash
-# Use 5% position size
-RISK_PARAMS='{"position_size": 0.05}' python scripts/optimize_strategy.py --strategy sma --data-file data/file.csv --risk-manager fixed_position
-```
+- `--output`: Custom output path (default: auto-generated in `output/optimizations/`)
 
-### Fixed Risk Manager
-```bash
-# Risk 1% of capital per trade
-RISK_PARAMS='{"risk_percent": 0.01, "default_stop_distance": 0.02}' python scripts/optimize_strategy.py --strategy sma --data-file data/file.csv --risk-manager fixed_risk
-```
+## Parameter Configuration
 
-## Output Files
+### Default Parameter Ranges
 
-The optimizer generates two files in `output/optimizations/`:
+Each strategy has default parameter ranges that will be used if no custom configuration is provided:
 
-1. **JSON Results** (`strategy_YYYYMMDD_HHMMSS.json`):
-   - Best parameters found
-   - Performance metrics
-   - Complete results for all tested combinations
-   - Metadata about the optimization run
-
-2. **Heatmap Visualization** (`strategy_YYYYMMDD_HHMMSS.png`):
-   - Generated automatically for 2-parameter optimizations
-   - Color-coded performance map
-   - Red star marks the best parameter combination
-
-## Custom Parameter Spaces
-
-You can define custom parameter spaces using JSON instead of the default ranges. This gives you full control over which parameters to optimize and their ranges.
-
-### JSON Format
-
+**SMA Strategy:**
 ```json
 {
-  "parameter_name": {
-    "type": "int|float|choice",
-    "min": minimum_value,
-    "max": maximum_value,
-    "step": step_size,
-    "choices": [list_of_choices]  // Only for choice type
-  }
+  "short_window": {"min": 5, "max": 50, "step": 5},
+  "long_window": {"min": 20, "max": 200, "step": 20},
+  "stop_loss_pct": {"min": 0.01, "max": 0.05, "step": 0.01},
+  "take_profit_pct": {"min": 0.02, "max": 0.10, "step": 0.02}
 }
+```
+
+**FVG Strategy:**
+```json
+{
+  "h1_lookback_candles": {"min": 12, "max": 48, "step": 12},
+  "risk_reward_ratio": {"min": 1.5, "max": 4.0, "step": 0.5},
+  "max_hold_hours": {"min": 2, "max": 8, "step": 2},
+  "position_size": {"min": 0.02, "max": 0.10, "step": 0.02}
+}
+```
+
+**Breakout Strategy:**
+```json
+{
+  "entry_lookback": {"min": 15, "max": 60, "step": 15},
+  "exit_lookback": {"min": 5, "max": 30, "step": 5},
+  "atr_multiplier": {"min": 1.0, "max": 3.5, "step": 0.5},
+  "medium_trend_threshold": {"min": 0.02, "max": 0.10, "step": 0.02},
+  "relative_volume_threshold": {"min": 1.2, "max": 3.0, "step": 0.4},
+  "cooldown_periods": {"min": 2, "max": 20, "step": 6}
+}
+```
+
+### Custom Parameter Configuration
+
+You can provide custom parameter ranges in three ways:
+
+#### 1. JSON String
+```bash
+python scripts/optimize_strategy.py --strategy sma \
+  --data-file data.csv \
+  --param-config '{"short_window": {"min": 10, "max": 30, "step": 5}, "long_window": {"min": 40, "max": 60, "step": 10}}'
+```
+
+#### 2. JSON File
+Create a file `params.json`:
+```json
+{
+  "short_window": {"min": 10, "max": 30, "step": 5},
+  "long_window": {"min": 40, "max": 60, "step": 10},
+  "stop_loss_pct": {"min": 0.02, "max": 0.03, "step": 0.01}
+}
+```
+
+Then use:
+```bash
+python scripts/optimize_strategy.py --strategy sma --data-file data.csv --param-config params.json
+```
+
+#### 3. Environment Variable
+```bash
+export PARAMS='{"short_window": {"min": 10, "max": 30, "step": 5}}'
+python scripts/optimize_strategy.py --strategy sma --data-file data.csv --param-config PARAMS
 ```
 
 ### Parameter Types
 
-**Integer Parameters:**
+Parameters can be defined with different types:
+
+- **Integer parameters:**
+  ```json
+  {"type": "int", "min": 5, "max": 50, "step": 5}
+  ```
+
+- **Float parameters:**
+  ```json
+  {"type": "float", "min": 0.01, "max": 0.05, "step": 0.01}
+  ```
+
+- **Choice parameters:**
+  ```json
+  {"choices": [12, 24, 36, 48]}
+  ```
+
+- **Direct values list:**
+  ```json
+  {"values": [10, 20, 30, 50, 100]}
+  ```
+
+## Progress Tracking
+
+During optimization, you'll see a real-time progress bar showing:
+- Current progress (completed/total combinations)
+- Percentage complete
+- Elapsed time
+- Estimated time remaining (ETA)
+
+Example:
+```
+Starting optimization of 480 parameter combinations
+Using 8 parallel workers
+Optimizing for: win_rate (maximize)
+--------------------------------------------------------------------------------
+|████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░| 200/480 (41.7%) | Elapsed: 0:02:15 | ETA: 0:03:09
+```
+
+## Output Files
+
+The optimization generates several output files:
+
+### 1. CSV Results (`*_all_results.csv`)
+Contains all parameter combinations tested with their performance metrics:
+- All parameter values
+- Return percentage
+- Sharpe ratio
+- Win rate
+- Max drawdown
+- Number of trades
+- Profit factor
+- And more...
+
+### 2. Best Parameters (`*_best_params.json`)
+JSON file with the best parameter combination and its metrics:
 ```json
-{"short_window": {"type": "int", "min": 5, "max": 50, "step": 5}}
+{
+  "best_params": {
+    "short_window": 15,
+    "long_window": 45,
+    "stop_loss_pct": 0.02,
+    "take_profit_pct": 0.05
+  },
+  "best_metrics": {
+    "return_pct": 25.34,
+    "sharpe_ratio": 1.82,
+    "win_rate": 58.5,
+    "max_drawdown": 8.2,
+    "profit_factor": 1.95,
+    "num_trades": 42
+  }
+}
 ```
 
-**Float Parameters:**
-```json
-{"stop_loss_pct": {"type": "float", "min": 0.01, "max": 0.05, "step": 0.01}}
-```
+### 3. Comprehensive Visualization (`*_comprehensive_*.png`)
+Multi-panel chart showing:
+- Top 30 parameter combinations ranked by metric
+- Risk-return scatter plot
+- Efficiency metrics (Sharpe vs Win Rate)
+- Distribution of key metrics
+- Correlation heatmap
+- Parameter importance analysis
 
-**Choice Parameters:**
-```json
-{"strategy_mode": {"type": "choice", "choices": ["aggressive", "conservative", "balanced"]}}
-```
+### 4. Heatmap (`*_heatmap_*.png`)
+2D heatmap showing metric values for parameter pairs (when applicable)
 
-### Usage Methods
+### 5. PDF Report (`*_comprehensive_*.pdf`)
+High-resolution PDF version of the comprehensive visualization
 
-**1. Inline JSON String:**
-```bash
-python scripts/optimize_strategy.py \
-  --strategy sma \
-  --data-file data/file.csv \
-  --param-space '{"short_window": {"type": "int", "min": 8, "max": 15, "step": 2}, "long_window": {"type": "int", "min": 25, "max": 40, "step": 5}}'
-```
+## Usage Examples
 
-**2. Environment Variable:**
-```bash
-# Set parameter space in environment variable
-export PARAM_SPACE='{"short_window": {"type": "int", "min": 10, "max": 30, "step": 5}, "long_window": {"type": "int", "min": 50, "max": 150, "step": 25}}'
-
-# Use environment variable
-python scripts/optimize_strategy.py --strategy sma --data-file data/file.csv --param-space PARAM_SPACE
-```
-
-### Custom Parameter Examples
-
-**SMA Strategy with Fine-Tuned Windows:**
+### Example 1: Basic SMA Optimization
 ```bash
 python scripts/optimize_strategy.py \
   --strategy sma \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
   --start 2024-01-01 \
   --end 2024-06-01 \
-  --param-space '{"short_window": {"type": "int", "min": 8, "max": 15, "step": 1}, "long_window": {"type": "int", "min": 20, "max": 40, "step": 2}}'
+  --metric sharpe_ratio
 ```
 
-**FVG Strategy with Custom Risk-Reward:**
+### Example 2: FVG Strategy with Custom Parameters
 ```bash
 python scripts/optimize_strategy.py \
   --strategy fvg \
   --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
-  --start 2024-01-01 \
-  --end 2024-06-01 \
-  --param-space '{"h1_lookback_candles": {"type": "choice", "choices": [12, 24, 36, 48]}, "risk_reward_ratio": {"type": "float", "min": 1.5, "max": 5.0, "step": 0.25}}'
+  --param-config '{"h1_lookback_candles": {"choices": [12, 24, 36]}, "risk_reward_ratio": {"min": 2.0, "max": 3.0, "step": 0.5}}' \
+  --metric return_pct \
+  --n-jobs 8
 ```
 
-**SMA with Risk Parameters:**
+### Example 3: Minimize Drawdown with Risk Manager
 ```bash
 python scripts/optimize_strategy.py \
-  --strategy sma \
-  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
-  --param-space '{"short_window": {"type": "int", "min": 10, "max": 20, "step": 2}, "long_window": {"type": "int", "min": 30, "max": 60, "step": 10}, "stop_loss_pct": {"type": "float", "min": 0.015, "max": 0.03, "step": 0.005}, "take_profit_pct": {"type": "float", "min": 0.02, "max": 0.06, "step": 0.01}}'
-```
-
-## Advanced Examples
-
-### Long-Term SMA Optimization
-```bash
-# Optimize SMA on full year of data with high capital
-python scripts/optimize_strategy.py \
-  --strategy sma \
-  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
-  --start 2024-01-01 \
-  --end 2025-01-01 \
-  --initial-capital 100000 \
-  --commission 0.0005 \
-  --risk-manager fixed_risk \
-  --output output/optimizations/sma_full_year_optimization.json
-```
-
-### FVG Strategy with Conservative Risk
-```bash
-# Optimize FVG with conservative fixed risk manager
-RISK_PARAMS='{"risk_percent": 0.005, "default_stop_distance": 0.015}' \
-python scripts/optimize_strategy.py \
-  --strategy fvg \
-  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
-  --risk-manager fixed_risk \
-  --metric "Sharpe Ratio" \
-  --start 2024-01-01 \
-  --end 2024-06-01 \
-  --debug
-```
-
-### Minimize Drawdown Optimization
-```bash
-# Find parameters that minimize maximum drawdown
-python scripts/optimize_strategy.py \
-  --strategy sma \
-  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
-  --metric "Max. Drawdown [%]" \
+  --strategy breakout \
+  --data-file data/cleaned/ETH_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+  --metric max_drawdown \
   --minimize \
-  --start 2024-01-01 \
-  --end 2024-06-01
+  --risk-manager fixed_risk \
+  --initial-capital 50000
 ```
 
-## Performance Considerations
+### Example 4: Quick Test with Limited Parameters
+```bash
+python scripts/optimize_strategy.py \
+  --strategy sma \
+  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+  --start 2024-05-01 \
+  --end 2024-05-31 \
+  --param-config '{"short_window": {"values": [10, 20]}, "long_window": {"values": [30, 50]}}' \
+  --metric win_rate
+```
 
-### Parallel vs Sequential Optimization
+### Example 5: Using Parameter File
+Create `optimization_params.json`:
+```json
+{
+  "h1_lookback_candles": {"choices": [12, 24]},
+  "risk_reward_ratio": {"min": 1.5, "max": 3.0, "step": 0.5},
+  "max_hold_hours": {"values": [2, 4, 6]},
+  "position_size": {"min": 0.05, "max": 0.1, "step": 0.05}
+}
+```
 
-**Parallel Optimization (Default):**
-- Uses all available CPU cores by default (`--n-jobs -1`)
-- 2-8x faster depending on your hardware
-- Best for large parameter spaces (>20 combinations)
-- Uses backtesting.py's built-in multiprocessing
+Run optimization:
+```bash
+python scripts/optimize_strategy.py \
+  --strategy fvg \
+  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv \
+  --param-config optimization_params.json \
+  --metric profit_factor
+```
 
-**Sequential Optimization:**
-- Single-threaded processing (`--use-simple`)
-- Better for debugging and small parameter spaces
-- More reliable heatmap generation
-- Lower memory usage
+## Tips for Effective Optimization
 
-### Optimization Time
-- **SMA Strategy (Parallel)**: ~100 combinations (2-5 minutes for 6 months of data)
-- **SMA Strategy (Sequential)**: ~100 combinations (5-10 minutes for 6 months of data)
-- **FVG Strategy (Parallel)**: ~200+ combinations (5-10 minutes for 6 months of data)
-- **FVG Strategy (Sequential)**: ~200+ combinations (10-20 minutes for 6 months of data)
-- **With Risk Optimization**: 2-4x longer due to additional parameters
+### 1. Start Small
+Begin with a limited date range and fewer parameter combinations to test quickly:
+```bash
+# Test on 1 month with coarse parameter steps
+--start 2024-05-01 --end 2024-06-01 \
+--param-config '{"short_window": {"min": 10, "max": 30, "step": 10}}'
+```
 
-### Hardware Recommendations
-- **CPU**: 4+ cores recommended for parallel optimization
-- **RAM**: 8GB+ for large parameter spaces (>100 combinations)
-- **Storage**: SSD recommended for faster data loading
+### 2. Use Multiple Metrics
+Optimize for different metrics to understand trade-offs:
+- `win_rate`: For consistent strategies
+- `sharpe_ratio`: For risk-adjusted returns
+- `profit_factor`: For profitability assessment
+- `max_drawdown` (minimize): For risk management
 
-### Data Requirements
-- Minimum 3 months of data recommended for reliable results
-- Use M15 (15-minute) timeframe for best balance of detail and speed
-- Ensure data quality - no gaps or missing values
+### 3. Parallel Processing
+Use all available CPU cores for faster optimization:
+```bash
+--n-jobs -1  # Uses all cores
+--n-jobs 4   # Uses 4 cores
+```
 
-### Memory Usage
-- **Parallel**: Each worker process requires ~100-200MB RAM
-- **Sequential**: ~50-100MB RAM total
-- Large parameter spaces (>500 combinations) may require 8GB+ RAM
-- Results are automatically memory-managed during optimization
+### 4. Data Splitting
+Optimize on training data, then validate on test data:
+```bash
+# Optimization period
+--start 2024-01-01 --end 2024-06-01
+
+# Validation period (run backtest with best params)
+--start 2024-06-01 --end 2024-08-01
+```
+
+### 5. Parameter Ranges
+- Start with wide ranges and coarse steps
+- Narrow down based on initial results
+- Fine-tune with smaller steps around promising values
+
+### 6. Risk Management
+Always test with appropriate risk management:
+```bash
+--risk-manager fixed_risk  # For percentage risk per trade
+--risk-manager fixed_position  # For fixed position sizing
+```
 
 ## Interpreting Results
 
-### Key Metrics
-- **Return [%]**: Total percentage return over the period
-- **Sharpe Ratio**: Risk-adjusted return (higher is better)
-- **Max. Drawdown [%]**: Worst peak-to-trough decline (lower is better)
-- **Win Rate [%]**: Percentage of profitable trades
-- **# Trades**: Total number of trades executed
-- **Profit Factor**: Gross profit / Gross loss ratio
+### Visualization Panels
 
-### Heatmap Analysis
-- **Green areas**: Better performance
-- **Red areas**: Poor performance
-- **Red star**: Best parameter combination
-- **Patterns**: Look for robust regions (consistent green areas)
+1. **Top Combinations Bar Chart**: Shows best parameter sets ranked by chosen metric
+2. **Risk-Return Profile**: Scatter plot of return vs drawdown (colored by metric)
+3. **Efficiency Metrics**: Relationship between win rate and Sharpe ratio
+4. **Distribution Histograms**: Frequency distribution of key metrics
+5. **Correlation Matrix**: How different metrics relate to each other
+6. **Parameter Importance**: Which parameters most affect the target metric
 
-### Parameter Selection Guidelines
-1. **Avoid overfitting**: Don't pick parameters that work on only narrow data ranges
-2. **Check robustness**: Good parameters should show consistent performance across different time periods
-3. **Consider trade frequency**: More trades = more statistical significance
-4. **Validate out-of-sample**: Test optimized parameters on different time periods
+### Key Metrics to Consider
+
+- **Return [%]**: Total percentage return
+- **Sharpe Ratio**: Return per unit of risk (> 1.0 is good, > 2.0 is excellent)
+- **Win Rate [%]**: Percentage of profitable trades (> 50% is positive)
+- **Max Drawdown [%]**: Largest peak-to-trough decline (< 20% is preferred)
+- **Profit Factor**: Gross profit / gross loss (> 1.5 is good)
+- **Number of Trades**: Total trades executed (ensures statistical significance)
+
+### Warning Signs
+
+- Very high returns with few trades (< 30) may indicate overfitting
+- Win rates near 0% or 100% suggest parameter issues
+- Sharpe ratio < 0 indicates negative risk-adjusted returns
+- Large drawdowns (> 30%) indicate high risk
 
 ## Troubleshooting
 
-### Common Issues
-1. **No trades generated**: Check if strategy parameters are too restrictive
-2. **Poor performance**: Strategy may not be suitable for the asset/timeframe
-3. **Long optimization time**: Reduce parameter space or data range
-4. **Memory errors**: Use smaller parameter ranges or more RAM
+### No Trades Generated
+- Check if parameter ranges are reasonable
+- Verify data quality and date range
+- Review strategy logic for the given parameters
 
-### Debug Mode
-Add `--debug` flag for detailed logging:
+### All Results Show -100% Return
+- Usually indicates strategy errors or invalid parameters
+- Check data column names (should be lowercase: open, high, low, close, volume)
+- Verify data is properly formatted with datetime index
+
+### Slow Performance
+- Reduce parameter combinations by increasing step sizes
+- Use fewer CPU cores if memory is limited
+- Optimize on shorter time periods
+
+### Memory Issues
+- Reduce `--n-jobs` to use fewer parallel workers
+- Use smaller data samples
+- Close other applications
+
+### "Unrecognized arguments" Error
+- Make sure to use `--param-config` (not `--param-space`)
+- Ensure JSON is properly formatted with quotes
+- On command line, use single quotes around JSON: `'{"key": "value"}'`
+
+## Advanced Usage
+
+### Custom Optimization Metrics
+You can extend the system by modifying the `ManualGridSearchOptimizer` class in `framework/optimization/manual_grid_search.py` to add custom metrics.
+
+### Batch Optimization
+Create a shell script for multiple optimizations:
 ```bash
-python scripts/optimize_strategy.py --strategy sma --data-file data/file.csv --debug
+#!/bin/bash
+for symbol in BTC_USDT ETH_USDT SOL_USDT; do
+  python scripts/optimize_strategy.py \
+    --strategy sma \
+    --data-file "data/cleaned/${symbol}_binance_15m_2024-01-01_2025-08-20_cleaned.csv" \
+    --metric sharpe_ratio \
+    --output "output/optimizations/batch_${symbol}"
+done
 ```
 
-This will show:
-- Parameter combinations being tested
-- Strategy initialization details
-- Trade execution logs
-- Risk management decisions
+### Parameter Sensitivity Analysis
+After optimization, analyze the CSV results to understand parameter sensitivity:
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
 
-## Example Workflow
+# Load results
+df = pd.read_csv('output/optimizations/sma_BTC_USDT_20240901_120000_all_results.csv')
 
-1. **Quick Test**: Run small optimization on 1-2 months of data
-2. **Parameter Analysis**: Review heatmap and identify promising regions
-3. **Extended Optimization**: Run longer optimization on 6-12 months of data
-4. **Out-of-Sample Validation**: Test best parameters on different time periods
-5. **Production Deployment**: Use validated parameters in live trading
+# Plot parameter impact
+for param in ['short_window', 'long_window']:
+    plt.figure()
+    df.groupby(param)['win_rate'].mean().plot(kind='bar')
+    plt.title(f'Impact of {param} on Win Rate')
+    plt.show()
+```
+
+### Running with Best Parameters
+After optimization, use the best parameters in a regular backtest:
+```bash
+# Extract best params from JSON
+best_params=$(cat output/optimizations/sma_*_best_params.json | jq -r '.best_params | to_entries | map("\(.key)=\(.value)") | join(",")')
+
+# Run backtest with best params
+STRATEGY_PARAMS="{$best_params}" python scripts/run_backtest.py \
+  --strategy sma \
+  --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv
+```
 
 ## Best Practices
 
-1. **Start Small**: Begin with small parameter ranges and short time periods
-2. **Use Multiple Metrics**: Optimize for different metrics to find robust parameters
-3. **Consider Transaction Costs**: Include realistic commission rates
-4. **Validate Results**: Always test optimized parameters on unseen data
-5. **Document Results**: Save optimization runs with descriptive names
+1. **Always validate**: Test optimized parameters on out-of-sample data
+2. **Consider transaction costs**: Include realistic commission rates
+3. **Use appropriate metrics**: Match optimization metric to trading goals
+4. **Document results**: Keep notes on optimization runs and findings
+5. **Avoid over-optimization**: Too many parameters can lead to curve fitting
+6. **Test robustness**: Verify parameters work across different market conditions
+7. **Monitor progress**: Use the progress bar to estimate completion time
+8. **Save configurations**: Store successful parameter configurations for reuse
 
-## Example Scripts
+## Complete Command Reference
 
-For complete working examples, see `examples/custom_optimization_examples.sh` which demonstrates:
-
-1. **Fine-tuned SMA parameters** - Using step=1 for precise window optimization
-2. **Choice-based optimization** - Using discrete parameter choices
-3. **Environment variable usage** - Complex parameter spaces via env vars  
-4. **Multi-parameter optimization** - Including risk parameters in search space
-
-Run the examples:
 ```bash
-# Run all optimization examples
-./examples/custom_optimization_examples.sh
+python scripts/optimize_strategy.py [OPTIONS]
 
-# Or run individual examples
-bash examples/custom_optimization_examples.sh
+Required:
+  --strategy {sma,fvg,breakout}    Strategy to optimize
+  --data-file PATH                  Path to CSV data file
+
+Optional:
+  --start YYYY-MM-DD               Start date for data
+  --end YYYY-MM-DD                 End date for data
+  --metric {return_pct,sharpe_ratio,win_rate,max_drawdown,profit_factor,calmar_ratio}
+                                   Metric to optimize (default: win_rate)
+  --minimize                       Minimize metric instead of maximize
+  --param-config JSON/FILE         Custom parameter configuration
+  --risk-manager {fixed_position,fixed_risk}
+                                   Risk management type
+  --initial-capital FLOAT          Initial capital (default: 10000)
+  --commission FLOAT               Commission rate (default: 0.001)
+  --margin FLOAT                   Margin requirement (default: 0.01)
+  --n-jobs INT                     Parallel workers (default: -1 for all cores)
+  --output PATH                    Output path for results
+  --debug                          Enable debug logging
 ```
+
+## Conclusion
+
+The optimization system provides a powerful framework for systematic strategy parameter selection. By following this guide and best practices, you can effectively find robust parameter combinations that improve trading strategy performance.
