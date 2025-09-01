@@ -33,6 +33,7 @@ dependencies = [
     # Visualization - required for tests
     "matplotlib>=3.7.0",
     "backtesting",
+    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]
