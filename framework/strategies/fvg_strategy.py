@@ -93,8 +93,6 @@ class FVGStrategy(BaseStrategy):
         Returns:
             DataFrame with trading signals and position management columns
         """
-        print(f"DEBUG: FVG Strategy generate_signals called with {len(data)} data points")
-        print(f"DEBUG: Data range: {data.index[0]} to {data.index[-1]}")
         
         if not self.validate_data(data):
             raise ValueError("Invalid input data format")
@@ -108,14 +106,11 @@ class FVGStrategy(BaseStrategy):
         
         # Need sufficient data for analysis
         if len(data) < 100:
-            print(f"DEBUG: Insufficient data: {len(data)} < 100, returning empty signals")
             return signals_df
         
         # Detect timeframe - strategy only works with M15 data
         timeframe = self._detect_timeframe(data)
-        print(f"DEBUG: Detected timeframe: {timeframe}")
         if timeframe != '15T':
-            print(f"DEBUG: Strategy requires 15T (M15) timeframe, got {timeframe}, returning empty signals")
             return signals_df
         
         # Resample M15 data to H4 for H4 FVG detection
@@ -127,11 +122,9 @@ class FVGStrategy(BaseStrategy):
             'volume': 'sum'
         }).dropna()
         
-        print(f"DEBUG: Resampled {len(data)} M15 candles to {len(h4_data)} H4 candles")
         
         # Detect H4 FVGs
         h4_fvgs = self.fvg_detector.detect_fvgs(h4_data, merge_consecutive=True)
-        print(f"DEBUG: Found {len(h4_fvgs)} H4 FVGs")
         
         # Resample M15 data to daily for daily open filter
         daily_data = data.resample('D').agg({
@@ -142,28 +135,16 @@ class FVGStrategy(BaseStrategy):
             'volume': 'sum'
         }).dropna()
         
-        print(f"DEBUG: Resampled {len(data)} M15 candles to {len(daily_data)} daily candles")
         
         # Detect M15 FVGs
         m15_fvgs = self.fvg_detector.detect_fvgs(data, merge_consecutive=True)
-        print(f"DEBUG: Found {len(m15_fvgs)} M15 FVGs")
         
         if len(m15_fvgs) == 0:
-            print("DEBUG: No M15 FVGs found, returning empty signals")
             return signals_df
             
         if len(h4_fvgs) == 0:
-            print("DEBUG: No H4 FVGs found, returning empty signals")
             return signals_df
         
-        # Show first few FVGs for debugging
-        for i, fvg in enumerate(h4_fvgs[:3]):
-            h4_time_start = h4_data.index[fvg.start_idx] if fvg.start_idx < len(h4_data) else "N/A"
-            h4_time_end = h4_data.index[fvg.end_idx] if fvg.end_idx < len(h4_data) else "N/A"
-            print(f"  H4 FVG {i}: {fvg.fvg_type}, idx {fvg.start_idx}-{fvg.end_idx}, time {h4_time_start} - {h4_time_end}, range {fvg.bottom:.6f}-{fvg.top:.6f}")
-        
-        for i, fvg in enumerate(m15_fvgs[:3]):
-            print(f"  M15 FVG {i}: {fvg.fvg_type}, idx {fvg.start_idx}-{fvg.end_idx}, range {fvg.bottom:.6f}-{fvg.top:.6f}")
         
         # Generate signals based on FVG formations
         signals_generated = 0
@@ -243,19 +224,7 @@ class FVGStrategy(BaseStrategy):
             self.session_trades[session_key] = current_time
             signals_generated += 1
             
-            print(f"DEBUG: Signal generated at {current_time}: {fvg.fvg_type} FVG, signal={signal}, price={current_price:.6f}, SL={stop_loss:.6f}, TP={take_profit:.6f}")
         
-        print(f"DEBUG SUMMARY:")
-        print(f"  Total M15 candles processed: {len(data)}")
-        print(f"  H4 FVGs found: {len(h4_fvgs)}")
-        print(f"  Daily candles found: {len(daily_data)}")
-        print(f"  M15 FVGs found: {len(m15_fvgs)}")
-        print(f"  Execution window opportunities: {execution_window_count}")
-        print(f"  Weekend blocked: {weekend_count}")
-        print(f"  Session limit blocked: {session_limit_count}")
-        print(f"  H4 unmitigated touch condition failed: {h4_touch_failed_count}")
-        print(f"  Daily open filter failed: {daily_filter_failed_count}")
-        print(f"  Signals generated: {signals_generated}")
         
         return signals_df
     

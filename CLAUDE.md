@@ -15,6 +15,7 @@ This is a comprehensive Python trading framework for algorithmic trading strateg
   - `base_strategy.py` - Abstract base class all strategies must inherit from
   - `sma_strategy.py` - Simple Moving Average crossover strategy implementation
   - `fvg_strategy.py` - Fair Value Gap multi-timeframe strategy implementation
+  - `breakout_strategy.py` - High/Low Breakout trend-following strategy with ATR-based stops
   - `detectors/` - Technical analysis pattern detectors (pivot points, FVG detection, etc.)
   - `utils/` - Strategy utilities (candlestick patterns, volume profile analysis)
 
@@ -56,11 +57,17 @@ uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BT
 # Basic backtest with FVG strategy (requires M15 data)
 uv run python scripts/run_backtest.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
+# Basic backtest with Breakout strategy
+uv run python scripts/run_backtest.py --strategy breakout --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+
 # Backtest with custom strategy parameters (SMA)
 STRATEGY_PARAMS='{"short_window": 10, "long_window": 20, "stop_loss_pct": 0.02, "take_profit_pct": 0.04}' uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
 # Backtest with custom FVG strategy parameters
 STRATEGY_PARAMS='{"h1_lookback_candles": 24, "risk_reward_ratio": 3.0, "max_hold_hours": 4, "position_size": 0.05}' uv run python scripts/run_backtest.py --strategy fvg --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
+
+# Backtest with custom Breakout strategy parameters
+STRATEGY_PARAMS='{"entry_lookback": 30, "exit_lookback": 15, "atr_multiplier": 3.0, "use_trend_filter": true, "use_volume_filter": false}' uv run python scripts/run_backtest.py --strategy breakout --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT
 
 # Backtest with date range
 uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BTC_USDT_binance_15m_2024-01-01_2025-08-20_cleaned.csv --symbol BTC_USDT --start 2024-01-01 --end 2024-03-31

@@ -209,15 +209,29 @@ class ParallelGridSearchOptimizer:
             # Don't request heatmap from backtesting.py as it can be unreliable
             # We'll generate our own if needed
             
-            stats, optimization_result = bt.optimize(
-                **param_ranges,
-                maximize=self.optimize_metric if self.maximize else f'-{self.optimize_metric}',
-                method='grid',
-                max_tries=None,  # Try all combinations
-                return_heatmap=False,
-                return_optimization=True,  # Get all results
-                random_state=None
-            )
+            # Try sambo method first to get all optimization results
+            try:
+                stats, optimization_result = bt.optimize(
+                    **param_ranges,
+                    maximize=self.optimize_metric,
+                    method='sambo',
+                    max_tries=total_combinations,  # Try all combinations
+                    return_heatmap=False,
+                    return_optimization=True,
+                    random_state=42
+                )
+            except Exception as e:
+                self.logger.warning(f"SAMBO method failed ({e}), falling back to grid search")
+                # Fallback to grid method without optimization results
+                stats = bt.optimize(
+                    **param_ranges,
+                    maximize=self.optimize_metric,
+                    method='grid',
+                    max_tries=None,
+                    return_heatmap=False,
+                    random_state=None
+                )
+                optimization_result = None
             
             heatmap = None  # Don't use backtesting.py's heatmap
             

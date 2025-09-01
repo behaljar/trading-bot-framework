@@ -22,6 +22,7 @@ from framework.optimization.parallel_grid_search import ParallelGridSearchOptimi
 from framework.optimization.parameter_space import ParameterSpace
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
+from framework.strategies.breakout_strategy import BreakoutStrategy
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
 from framework.utils.logger import setup_logger
@@ -161,6 +162,54 @@ def create_fvg_parameter_space(args) -> ParameterSpace:
     return space
 
 
+def create_breakout_parameter_space(args) -> ParameterSpace:
+    """Create parameter space for Breakout strategy."""
+    space = ParameterSpace()
+    
+    # Lookback periods
+    space.add_parameter('entry_lookback',
+                       min_value=15,
+                       max_value=60,
+                       step=15,
+                       param_type='int')
+    
+    space.add_parameter('exit_lookback',
+                       min_value=5,
+                       max_value=30,
+                       step=5,
+                       param_type='int')
+    
+    # ATR parameters
+    space.add_parameter('atr_multiplier',
+                       min_value=1.0,
+                       max_value=3.5,
+                       step=0.5,
+                       param_type='float')
+    
+    # Trend filter parameters
+    space.add_parameter('medium_trend_threshold',
+                       min_value=0.02,
+                       max_value=0.10,
+                       step=0.02,
+                       param_type='float')
+    
+    # Volume filter parameters
+    space.add_parameter('relative_volume_threshold',
+                       min_value=1.2,
+                       max_value=3.0,
+                       step=0.4,
+                       param_type='float')
+    
+    # Cooldown periods
+    space.add_parameter('cooldown_periods',
+                       min_value=2,
+                       max_value=20,
+                       step=6,
+                       param_type='int')
+    
+    return space
+
+
 def load_data(file_path: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """Load and prepare data for optimization."""
     if not os.path.exists(file_path):
@@ -188,7 +237,7 @@ def main():
     
     # Strategy selection
     parser.add_argument('--strategy', type=str, required=True,
-                       choices=['sma', 'fvg'],
+                       choices=['sma', 'fvg', 'breakout'],
                        help='Strategy to optimize')
     
     # Data parameters
@@ -255,6 +304,8 @@ def main():
             param_space = create_sma_parameter_space(args)
         elif args.strategy == 'fvg':
             param_space = create_fvg_parameter_space(args)
+        elif args.strategy == 'breakout':
+            param_space = create_breakout_parameter_space(args)
         else:
             raise ValueError(f"Unknown strategy: {args.strategy}")
         logger.info(f"Using default parameter space for {args.strategy}")
@@ -264,6 +315,8 @@ def main():
         strategy_class = SMAStrategy
     elif args.strategy == 'fvg':
         strategy_class = FVGStrategy
+    elif args.strategy == 'breakout':
+        strategy_class = BreakoutStrategy
     else:
         raise ValueError(f"Unknown strategy: {args.strategy}")
     
@@ -303,6 +356,8 @@ def main():
             commission=args.commission,
             margin=args.margin,
             risk_manager=risk_manager,
+            optimize_metric=args.metric,
+            maximize=not args.minimize,
             n_jobs=args.n_jobs,
             debug=args.debug
         )
