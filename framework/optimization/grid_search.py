@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Manual Grid Search Optimizer
+Grid Search Optimizer
 
-Direct backtest execution without using bt.optimize for better control and visualization.
+Direct backtest execution with parallel processing for optimal performance.
 """
 
 import pandas as pd
@@ -18,6 +18,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import time
 import sys
+import os
 
 from backtesting import Backtest
 from backtesting.lib import FractionalBacktest
@@ -187,11 +188,11 @@ def worker_run_backtest(params):
     )
 
 
-class ManualGridSearchOptimizer:
+class GridSearchOptimizer:
     """
-    Manual grid search optimizer using direct bt.run() calls.
+    Grid search optimizer using direct bt.run() calls with parallel processing.
     
-    Provides better control and visualization compared to bt.optimize().
+    Provides full control over parameter optimization with multiprocessing support.
     """
     
     def __init__(self,
@@ -307,11 +308,21 @@ class ManualGridSearchOptimizer:
             
             # Process results with progress bar
             completed = 0
-            for future in as_completed(futures):
-                result = future.result()
-                results.append(result)
-                completed += 1
-                self._print_progress_bar(completed, total, start_time)
+            try:
+                for future in as_completed(futures):
+                    result = future.result()
+                    results.append(result)
+                    completed += 1
+                    self._print_progress_bar(completed, total, start_time)
+            except KeyboardInterrupt:
+                print(f"\n\n🛑 Optimization interrupted after {completed}/{total} combinations")
+                print("🔄 Cancelling remaining tasks...")
+                # Cancel remaining futures
+                for future in futures:
+                    future.cancel()
+                # Shutdown executor immediately
+                executor.shutdown(wait=False, cancel_futures=True)
+                print("✅ Tasks cancelled. Processing completed results...")
         
         # Print completion summary
         total_time = time.time() - start_time

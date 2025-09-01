@@ -387,7 +387,7 @@ Always test with appropriate risk management:
 ## Advanced Usage
 
 ### Custom Optimization Metrics
-You can extend the system by modifying the `ManualGridSearchOptimizer` class in `framework/optimization/manual_grid_search.py` to add custom metrics.
+You can extend the system by modifying the `GridSearchOptimizer` class in `framework/optimization/manual_grid_search.py` to add custom metrics.
 
 ### Batch Optimization
 Create a shell script for multiple optimizations:

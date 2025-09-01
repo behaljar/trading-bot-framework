@@ -24,7 +24,7 @@ class TestSMAStrategy:
 
     def create_test_data(self, length=50):
         """Create test OHLCV data."""
-        dates = pd.date_range(start='2024-01-01', periods=length, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=length, freq='1h')
         
         # Create trending price data for testing crossovers
         base_price = 100.0
@@ -95,7 +95,7 @@ class TestSMAStrategy:
     def test_generate_signals_crossover_detection(self):
         """Test crossover signal detection."""
         # Create data with known crossover pattern
-        dates = pd.date_range(start='2024-01-01', periods=20, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=20, freq='1h')
         
         # Prices that will create a clear golden cross
         prices_down = [100] * 8  # Flat for MA stabilization
@@ -134,7 +134,7 @@ class TestSMAStrategy:
     def test_stop_loss_calculation_short(self):
         """Test stop loss calculation for short positions."""
         # Create data that triggers short signals
-        dates = pd.date_range(start='2024-01-01', periods=20, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=20, freq='1h')
         
         # Prices that start high then decline (death cross pattern)
         prices_high = [120] * 8
@@ -178,7 +178,7 @@ class TestSMAStrategy:
     def test_take_profit_calculation_short(self):
         """Test take profit calculation for short positions."""
         # Create data that triggers short signals
-        dates = pd.date_range(start='2024-01-01', periods=20, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=20, freq='1h')
         prices_high = [120] * 8
         prices_down = list(range(119, 107, -1))
         close_prices = prices_high + prices_down
@@ -257,7 +257,7 @@ class TestSMAStrategy:
     def test_ma_calculation_accuracy(self):
         """Test that moving averages are calculated correctly."""
         # Create simple test data for easy verification
-        dates = pd.date_range(start='2024-01-01', periods=15, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=15, freq='1h')
         close_prices = list(range(100, 115))  # 100, 101, 102, ..., 114
         
         data = pd.DataFrame({
@@ -282,7 +282,7 @@ class TestSMAStrategy:
     def test_crossover_timing(self):
         """Test that crossover signals occur at the correct timing."""
         # Create data where we know exactly when crossover should happen
-        dates = pd.date_range(start='2024-01-01', periods=25, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=25, freq='1h')
         
         # Design prices to create controlled crossover
         # First 10 periods: declining (short MA below long MA)

@@ -18,7 +18,7 @@ class TestWalkForwardAnalyzer:
     def create_test_data(self, length=500):
         """Create test data for walk-forward analysis."""
         start_date = datetime(2024, 1, 1)
-        dates = pd.date_range(start=start_date, periods=length, freq='1H')
+        dates = pd.date_range(start=start_date, periods=length, freq='1h')
         
         # Create realistic price data with some trend
         base_price = 100.0
@@ -361,7 +361,7 @@ class TestWalkForwardAnalyzer:
         with pytest.raises(ValueError, match="Data must have DatetimeIndex"):
             analyzer.analyze(invalid_data, symbol="TEST")
 
-    @patch('framework.optimization.walk_forward_analyzer.ManualGridSearchOptimizer')
+    @patch('framework.optimization.walk_forward_analyzer.GridSearchOptimizer')
     def test_run_walk_forward_period_success(self, mock_optimizer_class):
         """Test successful walk-forward period execution."""
         param_config = self.create_param_config()
@@ -453,7 +453,7 @@ class TestWalkForwardAnalyzer:
         
         assert result is None  # Should return None for insufficient data
 
-    @patch('framework.optimization.walk_forward_analyzer.ManualGridSearchOptimizer')
+    @patch('framework.optimization.walk_forward_analyzer.GridSearchOptimizer')
     def test_run_walk_forward_period_optimization_failure(self, mock_optimizer_class):
         """Test walk-forward period with optimization failure."""
         param_config = self.create_param_config()
@@ -508,7 +508,7 @@ class TestWalkForwardAnalyzer:
             
             analyzer._save_results(results, summary, '/tmp', 'TEST')
 
-    @patch('framework.optimization.walk_forward_analyzer.ManualGridSearchOptimizer')
+    @patch('framework.optimization.walk_forward_analyzer.GridSearchOptimizer')
     def test_analyze_complete_flow(self, mock_optimizer_class):
         """Test complete analysis flow."""
         # Create sufficient test data

@@ -2,7 +2,7 @@
 """
 Strategy Optimization Script
 
-Simple wrapper for the manual grid search optimizer.
+Simple wrapper for the grid search optimizer.
 """
 
 import argparse
@@ -18,7 +18,7 @@ script_dir = Path(__file__).parent
 framework_dir = script_dir.parent
 sys.path.append(str(framework_dir))
 
-from framework.optimization.manual_grid_search import ManualGridSearchOptimizer
+from framework.optimization.grid_search import GridSearchOptimizer
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
@@ -170,7 +170,7 @@ def main():
         risk_manager = FixedRiskManager(risk_percent=0.01)
     
     # Create optimizer
-    optimizer = ManualGridSearchOptimizer(
+    optimizer = GridSearchOptimizer(
         strategy_class=strategy_class,
         parameter_config=param_config,
         data=data,

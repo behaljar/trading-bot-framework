@@ -27,7 +27,7 @@ class TestFVGStrategy:
     def create_test_data_m15(self, length=1000):
         """Create test M15 OHLCV data."""
         start_date = datetime(2024, 1, 1, tzinfo=pytz.UTC)
-        dates = pd.date_range(start=start_date, periods=length, freq='15T')
+        dates = pd.date_range(start=start_date, periods=length, freq='15min')
         
         # Create realistic price movement
         base_price = 50000.0
@@ -259,7 +259,7 @@ class TestFVGStrategy:
     def test_is_fvg_unmitigated_bullish(self):
         """Test FVG mitigation detection for bullish FVG."""
         # Create test data
-        dates = pd.date_range(start='2024-01-01', periods=10, freq='15T')
+        dates = pd.date_range(start='2024-01-01', periods=10, freq='15min')
         prices = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
         
         data = pd.DataFrame({
@@ -292,7 +292,7 @@ class TestFVGStrategy:
     def test_is_fvg_unmitigated_bearish(self):
         """Test FVG mitigation detection for bearish FVG."""
         # Create test data
-        dates = pd.date_range(start='2024-01-01', periods=10, freq='15T')
+        dates = pd.date_range(start='2024-01-01', periods=10, freq='15min')
         prices = [109, 108, 107, 106, 105, 104, 103, 102, 101, 100]
         
         data = pd.DataFrame({

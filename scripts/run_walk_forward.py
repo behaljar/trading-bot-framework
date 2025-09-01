@@ -2,7 +2,7 @@
 """
 Walk-Forward Analysis Runner
 
-Performs walk-forward analysis using ManualGridSearchOptimizer for consistent
+Performs walk-forward analysis using GridSearchOptimizer for consistent
 parameter optimization across IS/OOS periods.
 
 Example usage:
@@ -18,6 +18,7 @@ import pandas as pd
 import os
 import sys
 import json
+import signal
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -31,7 +32,33 @@ from framework.utils.logger import setup_logger
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
+from framework.strategies.silver_bullet_fvg_strategy import SilverBulletFVGStrategy
 from framework.optimization.walk_forward_analyzer import WalkForwardAnalyzer
+
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+
+def signal_handler(signum, frame):
+    """Handle Ctrl+C gracefully."""
+    global shutdown_requested
+    if shutdown_requested:
+        # Second Ctrl+C - force exit
+        print("\n\n⚠️  Force shutdown requested. Exiting immediately...")
+        import sys
+        sys.exit(1)
+    
+    print("\n\n🛑 Ctrl+C detected. Gracefully shutting down...")
+    print("⏳ Waiting for current optimization to complete...")
+    print("   (Press Ctrl+C again to force quit)")
+    shutdown_requested = True
+
+
+def setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown."""
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
 
 def load_data(file_path: str, start_date: Optional[str] = None, 
@@ -141,8 +168,10 @@ def print_results_summary(result: Dict[str, Any]):
 
 def main():
     """Main function for running walk-forward analysis."""
+    # Setup signal handlers for graceful shutdown
+    setup_signal_handlers()
     parser = argparse.ArgumentParser(
-        description="Run walk-forward analysis using ManualGridSearchOptimizer",
+        description="Run walk-forward analysis using GridSearchOptimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -158,7 +187,7 @@ Examples:
     )
     
     parser.add_argument("--strategy", type=str, required=True, 
-                       choices=['sma', 'fvg', 'breakout'],
+                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg'],
                        help="Strategy to analyze")
     parser.add_argument("--data-file", type=str, required=True,
                        help="Path to CSV data file")
@@ -207,7 +236,8 @@ Examples:
         strategy_classes = {
             'sma': SMAStrategy,
             'fvg': FVGStrategy,
-            'breakout': BreakoutStrategy
+            'breakout': BreakoutStrategy,
+            'silver_bullet_fvg': SilverBulletFVGStrategy
         }
         
         if args.strategy not in strategy_classes:
@@ -285,14 +315,30 @@ Examples:
         print(f"Output Directory: {output_dir}")
         print(f"Parallel Jobs: {analyzer.n_jobs}")
         
-        # Run walk-forward analysis
-        result = analyzer.analyze(data, args.symbol, output_dir)
+        # Run walk-forward analysis with interrupt handling
+        try:
+            result = analyzer.analyze(data, args.symbol, output_dir)
+            
+            if shutdown_requested:
+                print("\n⚠️  Analysis was interrupted but partial results may be available")
+                print(f"📁 Check output directory: {output_dir}")
+                sys.exit(0)
+            
+            # Print results summary
+            print_results_summary(result)
+            
+            logger.info("Walk-forward analysis completed successfully")
+            
+        except KeyboardInterrupt:
+            print("\n\n🛑 Analysis interrupted by user")
+            print(f"📁 Partial results may be available in: {output_dir}")
+            # Force kill any remaining processes
+            os._exit(0)
         
-        # Print results summary
-        print_results_summary(result)
-        
-        logger.info("Walk-forward analysis completed successfully")
-        
+    except KeyboardInterrupt:
+        print("\n\n🛑 Analysis interrupted by user")
+        # Force exit to kill all child processes
+        os._exit(0)
     except Exception as e:
         logger.error(f"Walk-forward analysis failed: {e}")
         sys.exit(1)

@@ -1,5 +1,5 @@
 """
-Tests for Manual Grid Search Optimizer.
+Tests for Grid Search Optimizer.
 """
 
 import pytest
@@ -7,8 +7,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
-from framework.optimization.manual_grid_search import (
-    ManualGridSearchOptimizer, 
+from framework.optimization.grid_search import (
+    GridSearchOptimizer, 
     generate_parameter_combinations,
     run_single_backtest
 )
@@ -98,7 +98,7 @@ class TestSingleBacktest:
 
     def create_test_data(self, length=100):
         """Create test data for backtesting."""
-        dates = pd.date_range(start='2024-01-01', periods=length, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=length, freq='1h')
         
         # Create trending data
         base_price = 100.0
@@ -167,12 +167,12 @@ class TestSingleBacktest:
         assert result['params'] == params
 
 
-class TestManualGridSearchOptimizer:
-    """Test ManualGridSearchOptimizer class."""
+class TestGridSearchOptimizer:
+    """Test GridSearchOptimizer class."""
 
     def create_test_data(self, length=200):
         """Create test data for optimization."""
-        dates = pd.date_range(start='2024-01-01', periods=length, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=length, freq='1h')
         
         # Create data with clear trend for SMA strategy testing
         base_price = 100.0
@@ -196,7 +196,7 @@ class TestManualGridSearchOptimizer:
             'long_window': {'values': [30, 40]}
         }
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -219,7 +219,7 @@ class TestManualGridSearchOptimizer:
         data = self.create_test_data()
         param_config = {'short_window': {'values': [10]}}
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -237,7 +237,7 @@ class TestManualGridSearchOptimizer:
         data = self.create_test_data()
         param_config = {'short_window': {'values': [10]}}
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -285,7 +285,7 @@ class TestManualGridSearchOptimizer:
         with patch('framework.optimization.manual_grid_search.as_completed') as mock_completed:
             mock_completed.return_value = [mock_future] * 4  # 4 combinations
             
-            optimizer = ManualGridSearchOptimizer(
+            optimizer = GridSearchOptimizer(
                 strategy_class=SMAStrategy,
                 parameter_config=param_config,
                 data=data,
@@ -318,7 +318,7 @@ class TestManualGridSearchOptimizer:
         with patch.object(ManualGridSearchOptimizer, '_run_parallel_optimization') as mock_run:
             mock_run.return_value = mock_results
             
-            optimizer = ManualGridSearchOptimizer(
+            optimizer = GridSearchOptimizer(
                 strategy_class=SMAStrategy,
                 parameter_config=param_config,
                 data=data,
@@ -350,7 +350,7 @@ class TestManualGridSearchOptimizer:
         data = self.create_test_data()
         param_config = {'short_window': {'values': [10]}}
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -377,7 +377,7 @@ class TestManualGridSearchOptimizer:
         data = self.create_test_data()
         param_config = {'short_window': {'values': [10]}}
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -399,12 +399,12 @@ class TestManualGridSearchOptimizer:
                 mock_open.assert_called()
 
 
-class TestManualGridSearchIntegration:
-    """Integration tests for ManualGridSearchOptimizer."""
+class TestGridSearchIntegration:
+    """Integration tests for GridSearchOptimizer."""
 
     def create_test_data(self, length=100):
         """Create test data for integration tests."""
-        dates = pd.date_range(start='2024-01-01', periods=length, freq='1H')
+        dates = pd.date_range(start='2024-01-01', periods=length, freq='1h')
         
         # Create simple trending data for reliable results
         prices = np.linspace(100, 120, length)
@@ -429,7 +429,7 @@ class TestManualGridSearchIntegration:
         
         risk_manager = FixedPositionSizeManager(position_size=0.1)
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,
@@ -460,7 +460,7 @@ class TestManualGridSearchIntegration:
         
         # Empty parameter config
         with pytest.raises(ValueError):
-            ManualGridSearchOptimizer(
+            GridSearchOptimizer(
                 strategy_class=SMAStrategy,
                 parameter_config={},
                 data=data
@@ -471,7 +471,7 @@ class TestManualGridSearchIntegration:
         data = self.create_test_data(10)  # Very small dataset
         param_config = {'short_window': {'values': [5]}}
         
-        optimizer = ManualGridSearchOptimizer(
+        optimizer = GridSearchOptimizer(
             strategy_class=SMAStrategy,
             parameter_config=param_config,
             data=data,

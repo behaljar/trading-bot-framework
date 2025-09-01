@@ -3,7 +3,7 @@ Walk-forward analysis implementation for strategy validation.
 
 Walk-forward analysis tests strategy robustness by optimizing parameters on 
 in-sample (IS) data and testing on out-of-sample (OOS) data across rolling 
-time windows. Uses ManualGridSearchOptimizer for consistent optimization.
+time windows. Uses GridSearchOptimizer for consistent optimization.
 """
 
 import pandas as pd
@@ -22,12 +22,12 @@ from framework.risk.base_risk_manager import BaseRiskManager
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
 from framework.utils.logger import setup_logger
-from .manual_grid_search import ManualGridSearchOptimizer
+from .grid_search import GridSearchOptimizer
 
 
 class WalkForwardAnalyzer:
     """
-    Walk-forward analysis using ManualGridSearchOptimizer.
+    Walk-forward analysis using GridSearchOptimizer.
     
     Optimizes parameters on in-sample data and tests on out-of-sample data
     across rolling time windows. Calculates Walk-Forward Efficiency (WFE)
@@ -54,7 +54,7 @@ class WalkForwardAnalyzer:
         
         Args:
             strategy_class: Strategy class to analyze
-            parameter_config: Parameter configuration for ManualGridSearchOptimizer
+            parameter_config: Parameter configuration for GridSearchOptimizer
             is_window_months: Months of in-sample data for optimization
             oos_window_months: Months of out-of-sample data for testing
             step_months: Months to step forward between periods
@@ -220,10 +220,10 @@ class WalkForwardAnalyzer:
             return None
         
         try:
-            # Step 1: Optimize on IS data using ManualGridSearchOptimizer
+            # Step 1: Optimize on IS data using GridSearchOptimizer
             self.logger.info(f"Period {period_num}: Optimizing on IS data ({len(is_data)} points)")
             
-            optimizer = ManualGridSearchOptimizer(
+            optimizer = GridSearchOptimizer(
                 strategy_class=self.strategy_class,
                 parameter_config=self.parameter_config,
                 data=is_data,
@@ -266,7 +266,7 @@ class WalkForwardAnalyzer:
             for param_name, param_value in best_params.items():
                 oos_param_config[param_name] = {'values': [param_value]}
             
-            oos_optimizer = ManualGridSearchOptimizer(
+            oos_optimizer = GridSearchOptimizer(
                 strategy_class=self.strategy_class,
                 parameter_config=oos_param_config,
                 data=oos_data,

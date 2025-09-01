@@ -1,0 +1,145 @@
+{
+  "silver_bullet_fvg_comprehensive": {
+    "description": "Comprehensive Silver Bullet FVG optimization testing all filter combinations",
+    "parameters": {
+      "risk_reward_ratio": {
+        "values": [1.5, 2.0, 2.5, 3.0],
+        "type": "float"
+      },
+      "m15_lookback_candles": {
+        "values": [96, 144, 192],
+        "type": "int"
+      },
+      "enable_london_open": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "enable_ny_open": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "enable_ny_afternoon": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "use_swing_hl_filter": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "swing_length": {
+        "values": [3, 5, 7],
+        "type": "int"
+      },
+      "require_swing_high_for_short": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_swing_low_for_long": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "use_bos_choch_filter": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_bos_for_entry": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_choch_for_entry": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "bos_lookback_candles": {
+        "values": [5, 10, 15],
+        "type": "int"
+      },
+      "use_liquidity_filter": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_liquidity_sweep": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "liquidity_lookback_candles": {
+        "values": [10, 20, 30],
+        "type": "int"
+      }
+    }
+  },
+  "silver_bullet_fvg_session_focus": {
+    "description": "Focus on session and core parameters optimization",
+    "parameters": {
+      "risk_reward_ratio": {
+        "values": [1.5, 2.0, 2.5, 3.0],
+        "type": "float"
+      },
+      "enable_london_open": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "enable_ny_open": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "enable_ny_afternoon": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "use_swing_hl_filter": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "use_bos_choch_filter": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "use_liquidity_filter": {
+        "values": [true, false],
+        "type": "bool"
+      }
+    }
+  },
+  "silver_bullet_fvg_filters_deep": {
+    "description": "Deep optimization of Smart Money Concepts filter parameters",
+    "parameters": {
+      "swing_length": {
+        "values": [3, 5, 7, 10],
+        "type": "int"
+      },
+      "require_swing_high_for_short": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_swing_low_for_long": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "bos_lookback_candles": {
+        "values": [5, 10, 15, 20],
+        "type": "int"
+      },
+      "require_bos_for_entry": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "require_choch_for_entry": {
+        "values": [true, false],
+        "type": "bool"
+      },
+      "liquidity_range_pct": {
+        "values": [0.05, 0.1, 0.15, 0.2],
+        "type": "float"
+      },
+      "liquidity_lookback_candles": {
+        "values": [10, 20, 30, 40],
+        "type": "int"
+      },
+      "require_liquidity_sweep": {
+        "values": [true, false],
+        "type": "bool"
+      }
+    }
+  }
+}

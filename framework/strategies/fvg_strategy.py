@@ -110,7 +110,7 @@ class FVGStrategy(BaseStrategy):
         
         # Detect timeframe - strategy only works with M15 data
         timeframe = self._detect_timeframe(data)
-        if timeframe != '15T':
+        if timeframe != '15min':
             return signals_df
         
         # Resample M15 data to H4 for H4 FVG detection
@@ -240,11 +240,11 @@ class FVGStrategy(BaseStrategy):
         most_common_diff = pd.Series(time_diffs).mode().iloc[0]
         
         if most_common_diff == timedelta(minutes=15):
-            return '15T'
+            return '15min'
         elif most_common_diff == timedelta(hours=1):
-            return '1H'
+            return '1h'
         elif most_common_diff == timedelta(hours=4):
-            return '4H'
+            return '4h'
         else:
             return 'unknown'
     

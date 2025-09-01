@@ -1,11 +1,11 @@
 # Walk-Forward Analysis
 
-Walk-forward analysis tests trading strategy robustness by optimizing parameters on in-sample (IS) data and testing on out-of-sample (OOS) data across rolling time windows. Uses ManualGridSearchOptimizer for consistent parameter optimization and calculates Walk-Forward Efficiency (WFE) to measure parameter robustness.
+Walk-forward analysis tests trading strategy robustness by optimizing parameters on in-sample (IS) data and testing on out-of-sample (OOS) data across rolling time windows. Uses GridSearchOptimizer for consistent parameter optimization and calculates Walk-Forward Efficiency (WFE) to measure parameter robustness.
 
 ## Overview
 
 Walk-forward analysis differs from standard backtesting by:
-- Optimizing parameters on in-sample data for each period using ManualGridSearchOptimizer
+- Optimizing parameters on in-sample data for each period using GridSearchOptimizer
 - Testing optimized parameters on out-of-sample data to validate robustness
 - Calculating Walk-Forward Efficiency (WFE) to measure optimization consistency
 - Providing insights into strategy performance across different market regimes
