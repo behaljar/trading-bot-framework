@@ -18,7 +18,6 @@ import pandas as pd
 import os
 import sys
 import json
-import signal
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -36,29 +35,6 @@ from framework.strategies.silver_bullet_fvg_strategy import SilverBulletFVGStrat
 from framework.optimization.walk_forward_analyzer import WalkForwardAnalyzer
 
 
-# Global flag for graceful shutdown
-shutdown_requested = False
-
-
-def signal_handler(signum, frame):
-    """Handle Ctrl+C gracefully."""
-    global shutdown_requested
-    if shutdown_requested:
-        # Second Ctrl+C - force exit
-        print("\n\n⚠️  Force shutdown requested. Exiting immediately...")
-        import sys
-        sys.exit(1)
-    
-    print("\n\n🛑 Ctrl+C detected. Gracefully shutting down...")
-    print("⏳ Waiting for current optimization to complete...")
-    print("   (Press Ctrl+C again to force quit)")
-    shutdown_requested = True
-
-
-def setup_signal_handlers():
-    """Setup signal handlers for graceful shutdown."""
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
 
 
 def load_data(file_path: str, start_date: Optional[str] = None, 
@@ -168,8 +144,6 @@ def print_results_summary(result: Dict[str, Any]):
 
 def main():
     """Main function for running walk-forward analysis."""
-    # Setup signal handlers for graceful shutdown
-    setup_signal_handlers()
     parser = argparse.ArgumentParser(
         description="Run walk-forward analysis using GridSearchOptimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -319,10 +293,6 @@ Examples:
         try:
             result = analyzer.analyze(data, args.symbol, output_dir)
             
-            if shutdown_requested:
-                print("\n⚠️  Analysis was interrupted but partial results may be available")
-                print(f"📁 Check output directory: {output_dir}")
-                sys.exit(0)
             
             # Print results summary
             print_results_summary(result)

@@ -48,7 +48,7 @@ class WalkForwardAnalyzer:
                  risk_manager_params: Optional[Dict[str, Any]] = None,
                  optimization_metric: str = "return_pct",
                  maximize: bool = True,
-                 n_jobs: int = -1):
+                 n_jobs: int = 4):
         """
         Initialize Walk-Forward Analyzer.
         
@@ -311,7 +311,9 @@ class WalkForwardAnalyzer:
             return result
             
         except Exception as e:
+            import traceback
             self.logger.error(f"Period {period_num} failed: {e}")
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             return None
     
     def _calculate_wfe(self, is_row: pd.Series, oos_row: pd.Series, 

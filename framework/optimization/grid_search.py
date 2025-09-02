@@ -176,16 +176,37 @@ def worker_init(strategy_class, data, initial_capital, commission, margin, risk_
 
 
 def worker_run_backtest(params):
-    """Worker function that uses global variables."""
-    return run_single_backtest(
-        params,
-        _worker_strategy_class,
-        _worker_data,
-        _worker_initial_capital,
-        _worker_commission,
-        _worker_margin,
-        _worker_risk_manager
-    )
+    """Worker function that uses global variables with error handling."""
+    try:
+        return run_single_backtest(
+            params,
+            _worker_strategy_class,
+            _worker_data,
+            _worker_initial_capital,
+            _worker_commission,
+            _worker_margin,
+            _worker_risk_manager
+        )
+    except Exception as e:
+        import traceback
+        # Return failed result with detailed error info
+        return {
+            'params': params,
+            'return_pct': -100,
+            'sharpe_ratio': -10,
+            'max_drawdown': 100,
+            'win_rate': 0,
+            'num_trades': 0,
+            'exposure_time': 0,
+            'profit_factor': 0,
+            'avg_trade': -100,
+            'best_trade': 0,
+            'worst_trade': -100,
+            'calmar_ratio': -10,
+            'sortino_ratio': -10,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
 
 
 class GridSearchOptimizer:
@@ -203,7 +224,7 @@ class GridSearchOptimizer:
                  commission: float = 0.001,
                  margin: float = 0.01,
                  risk_manager: Optional[BaseRiskManager] = None,
-                 n_jobs: int = -1,
+                 n_jobs: int = 4,
                  debug: bool = False):
         """
         Initialize the optimizer.
