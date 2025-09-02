@@ -134,21 +134,21 @@ def run_single_backtest(params: Dict[str, Any],
     except Exception as e:
         # Print error for debugging
         print(f"Error in backtest with params {params}: {e}")
-        # Return failed result
+        # Return neutral result (0% return when error/no trades)
         return {
             'params': params,
-            'return_pct': -100,
-            'sharpe_ratio': -10,
-            'max_drawdown': 100,
+            'return_pct': 0,
+            'sharpe_ratio': 0,
+            'max_drawdown': 0,
             'win_rate': 0,
             'num_trades': 0,
             'exposure_time': 0,
             'profit_factor': 0,
-            'avg_trade': -100,
+            'avg_trade': 0,
             'best_trade': 0,
-            'worst_trade': -100,
-            'calmar_ratio': -10,
-            'sortino_ratio': -10,
+            'worst_trade': 0,
+            'calmar_ratio': 0,
+            'sortino_ratio': 0,
             'error': str(e)
         }
 
@@ -189,21 +189,21 @@ def worker_run_backtest(params):
         )
     except Exception as e:
         import traceback
-        # Return failed result with detailed error info
+        # Return neutral result (0% return when error/no trades)
         return {
             'params': params,
-            'return_pct': -100,
-            'sharpe_ratio': -10,
-            'max_drawdown': 100,
+            'return_pct': 0,
+            'sharpe_ratio': 0,
+            'max_drawdown': 0,
             'win_rate': 0,
             'num_trades': 0,
             'exposure_time': 0,
             'profit_factor': 0,
-            'avg_trade': -100,
+            'avg_trade': 0,
             'best_trade': 0,
-            'worst_trade': -100,
-            'calmar_ratio': -10,
-            'sortino_ratio': -10,
+            'worst_trade': 0,
+            'calmar_ratio': 0,
+            'sortino_ratio': 0,
             'error': str(e),
             'traceback': traceback.format_exc()
         }
