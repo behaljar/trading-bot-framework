@@ -152,6 +152,7 @@ def create_default_manager() -> PreprocessorManager:
     Returns:
         PreprocessorManager with standard preprocessing steps
     """
+    from .column_capitalization_preprocessor import ColumnCapitalizationPreprocessor
     from .infinite_value_preprocessor import InfiniteValuePreprocessor
     from .nan_value_preprocessor import NanValuePreprocessor
     from .ohlc_validator_preprocessor import OhlcValidatorPreprocessor
@@ -161,6 +162,8 @@ def create_default_manager() -> PreprocessorManager:
     manager = PreprocessorManager("DefaultManager")
     
     # Add preprocessors in logical order
+    # Column capitalization should be first to standardize column names
+    manager.add_preprocessor(ColumnCapitalizationPreprocessor())
     manager.add_preprocessor(InfiniteValuePreprocessor())
     manager.add_preprocessor(NanValuePreprocessor())
     manager.add_preprocessor(OhlcValidatorPreprocessor())
