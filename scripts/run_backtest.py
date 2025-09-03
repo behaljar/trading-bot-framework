@@ -77,7 +77,7 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
                 strategy_params: Dict[str, Any], 
                 symbol: str,
                 initial_capital: float = 10000,
-                commission: float = 0.001,
+                commission: float = 0.0005,
                 use_fractional: bool = True,
                 risk_manager_type: str = "fixed_position",
                 risk_manager_params: Dict[str, Any] = None,
@@ -311,8 +311,8 @@ def main():
                        help="End date (YYYY-MM-DD)")
     parser.add_argument("--initial-capital", type=float, default=10000,
                        help="Initial capital (default: 10000)")
-    parser.add_argument("--commission", type=float, default=0.001,
-                       help="Commission rate (default: 0.001 = 0.1%%)")
+    parser.add_argument("--commission", type=float, default=0.0005,
+                       help="Commission rate (default: 0.0005 = 0.05%%)")
     parser.add_argument("--use-standard", action="store_true",
                        help="Use standard Backtest instead of FractionalBacktest (not recommended for high-priced assets)")
     parser.add_argument("--debug", action="store_true",

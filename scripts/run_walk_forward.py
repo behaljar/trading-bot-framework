@@ -181,8 +181,8 @@ Examples:
                        help="Window mode: 'rolling' (fixed IS window) or 'anchored' (expanding IS window) (default: rolling)")
     parser.add_argument("--initial-capital", type=float, default=10000,
                        help="Initial capital (default: 10000)")
-    parser.add_argument("--commission", type=float, default=0.001,
-                       help="Commission rate (default: 0.001 = 0.1%)")
+    parser.add_argument("--commission", type=float, default=0.0005,
+                       help="Commission rate (default: 0.0005 = 0.05%)")
     parser.add_argument("--margin", type=float, default=0.01,
                        help="Margin requirement (default: 0.01 = 100x leverage)")
     parser.add_argument("--risk-manager", type=str, default="fixed_risk",

@@ -221,7 +221,7 @@ class GridSearchOptimizer:
                  parameter_config: Dict[str, Any],
                  data: pd.DataFrame,
                  initial_capital: float = 10000,
-                 commission: float = 0.001,
+                 commission: float = 0.0005,
                  margin: float = 0.01,
                  risk_manager: Optional[BaseRiskManager] = None,
                  n_jobs: int = 4,

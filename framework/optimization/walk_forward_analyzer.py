@@ -42,7 +42,7 @@ class WalkForwardAnalyzer:
                  step_months: int = 1,
                  window_mode: str = "rolling",
                  initial_capital: float = 10000.0,
-                 commission: float = 0.001,
+                 commission: float = 0.0005,
                  margin: float = 0.01,
                  risk_manager_type: str = "fixed_risk",
                  risk_manager_params: Optional[Dict[str, Any]] = None,
