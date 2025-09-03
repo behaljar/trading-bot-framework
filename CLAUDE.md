@@ -209,3 +209,10 @@ Test outputs including charts are saved to `output/tests/` directory.
 - Do not create new scripts for every feature - extend existing ones
 - Keep the framework simple and uncluttered while maintaining full functionality
 - Minimize script count to maintain clean project structure
+
+### Documentation Rules
+- All documentation files (except README.md and CLAUDE.md) must be created in the `docs/` folder only
+- Use UPPERCASE naming convention for docs files (e.g., STRATEGY_NAME.md, not strategy_name.md)  
+- Follow the documentation style and format used by existing docs in the project
+- Do not create multiple documentation files for the same feature/strategy
+- Only create documentation when explicitly requested by the user

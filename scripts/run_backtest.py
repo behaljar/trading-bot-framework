@@ -35,9 +35,11 @@ from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
 from framework.strategies.silver_bullet_fvg_strategy import SilverBulletFVGStrategy
+from framework.strategies.ict_silver_bullet_strategy import ICTSilverBulletStrategy
 from framework.backtesting.strategy_wrapper import create_wrapper_class
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
+from framework.risk.strategy_position_size_manager import StrategyPositionSizeManager
 
 
 def load_data(file_path: str, start_date: Optional[str] = None, 
@@ -101,6 +103,7 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
         'fvg': FVGStrategy,
         'breakout': BreakoutStrategy,
         'silver_bullet_fvg': SilverBulletFVGStrategy,
+        'ict_silver_bullet': ICTSilverBulletStrategy
         # Add more strategies here as they become available
         # 'rsi': RSIStrategy,
         # 'macd': MACDStrategy,
@@ -126,8 +129,14 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
             risk_percent=risk_manager_params.get('risk_percent', 0.01),
             default_stop_distance=risk_manager_params.get('default_stop_distance', 0.02)
         )
+    elif risk_manager_type == "strategy_position":
+        risk_manager = StrategyPositionSizeManager(
+            max_position_size=risk_manager_params.get('max_position_size', 1.0),
+            min_position_size=risk_manager_params.get('min_position_size', 0.001),
+            apply_safety_limits=risk_manager_params.get('apply_safety_limits', True)
+        )
     else:
-        raise ValueError(f"Unknown risk manager type: {risk_manager_type}. Available: ['fixed_position', 'fixed_risk']")
+        raise ValueError(f"Unknown risk manager type: {risk_manager_type}. Available: ['fixed_position', 'fixed_risk', 'strategy_position']")
     
     # Create wrapper strategy class
     WrapperClass = create_wrapper_class(
@@ -259,7 +268,7 @@ def main():
     """Main function for running backtests."""
     parser = argparse.ArgumentParser(description="Run backtest using backtesting.py library")
     parser.add_argument("--strategy", type=str, required=True, 
-                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg'],
+                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg', 'ict_silver_bullet'],
                        help="Strategy to use")
     parser.add_argument("--data-file", type=str, required=True,
                        help="Path to CSV data file")
@@ -272,13 +281,13 @@ def main():
     parser.add_argument("--initial-capital", type=float, default=10000,
                        help="Initial capital (default: 10000)")
     parser.add_argument("--commission", type=float, default=0.001,
-                       help="Commission rate (default: 0.001 = 0.1%)")
+                       help="Commission rate (default: 0.001 = 0.1%%)")
     parser.add_argument("--use-standard", action="store_true",
                        help="Use standard Backtest instead of FractionalBacktest (not recommended for high-priced assets)")
     parser.add_argument("--debug", action="store_true",
                        help="Enable debug logging")
     parser.add_argument("--risk-manager", type=str, default="fixed_risk",
-                       choices=['fixed_position', 'fixed_risk'],
+                       choices=['fixed_position', 'fixed_risk', 'strategy_position'],
                        help="Risk manager type (default: fixed_risk)")
     
     args = parser.parse_args()

@@ -89,6 +89,11 @@ class StrategyWrapper(Strategy):
         
         signal = current_signal_row.get('signal', 0)
         
+        # Debug: Check if price data is valid
+        if self.__class__.debug and signal != 0:
+            self.logger.debug(f"Raw price data: Close[-1]={self.data.Close[-1]}, Open[-1]={self.data.Open[-1]}")
+            self.logger.debug(f"Data index[-1]={self.data.index[-1]}, Signal time={current_time}")
+        
         # Debug logging
         if self.__class__.debug and signal != 0:
             position_status = "None"
@@ -100,13 +105,17 @@ class StrategyWrapper(Strategy):
         stop_loss = current_signal_row.get('stop_loss', None)
         take_profit = current_signal_row.get('take_profit', None)
         
+        # Get strategy's position size if available
+        strategy_position_size = current_signal_row.get('position_size', None)
+        
         # Calculate position size using risk manager
         position_size = self.__class__.risk_manager.calculate_position_size(
             signal=signal,
             current_price=current_price,
             equity=self.equity,
             stop_loss=stop_loss,
-            take_profit=take_profit
+            take_profit=take_profit,
+            strategy_position_size=strategy_position_size
         )
         
         # Check stop loss and take profit for existing positions
@@ -144,6 +153,10 @@ class StrategyWrapper(Strategy):
             if self.__class__.debug:
                 self.logger.debug(f"Risk manager rejected trade: signal={signal}, stop_loss={stop_loss}")
             return
+            
+        # Debug position size
+        if self.__class__.debug:
+            self.logger.debug(f"About to execute trade: signal={signal}, position_size={position_size}, price={current_price}")
         
         # Close any existing position first if signal changes direction
         if self.position and (
@@ -158,24 +171,50 @@ class StrategyWrapper(Strategy):
             
         if signal == 1:  # Buy/Long signal
             if not self.position:
-                # Open long position
-                self.buy(size=position_size, sl=stop_loss, tp=take_profit)
-                
-                # Track position details for our own stop loss/take profit logic
-                self.entry_price = current_price
-                self.stop_loss_price = stop_loss
-                self.take_profit_price = take_profit
+                if self.__class__.debug:
+                    self.logger.debug(f"Executing LONG trade: size={position_size:.4f}, price={current_price:.6f}, sl={stop_loss}, tp={take_profit}")
+                try:
+                    # Open long position
+                    self.buy(size=position_size, sl=stop_loss, tp=take_profit)
+                    
+                    # Track position details for our own stop loss/take profit logic
+                    self.entry_price = current_price
+                    self.stop_loss_price = stop_loss
+                    self.take_profit_price = take_profit
+                    
+                    if self.__class__.debug:
+                        self.logger.debug(f"LONG trade executed successfully")
+                except Exception as e:
+                    if self.__class__.debug:
+                        self.logger.debug(f"LONG trade execution failed: {e}")
+                        
+            else:
+                if self.__class__.debug:
+                    self.logger.debug(f"LONG signal ignored - already have position")
                     
         elif signal == -1:  # Sell/Short signal
             if not self.position:
-                # Open short position
-                self.sell(size=position_size, sl=stop_loss, tp=take_profit)
-                
-                # Track position details for our own stop loss/take profit logic
-                self.entry_price = current_price
-                # For short positions, stop loss is above entry, take profit is below
-                self.stop_loss_price = stop_loss
-                self.take_profit_price = take_profit
+                if self.__class__.debug:
+                    self.logger.debug(f"Executing SHORT trade: size={position_size:.4f}, price={current_price:.6f}, sl={stop_loss}, tp={take_profit}")
+                try:
+                    # Open short position
+                    self.sell(size=position_size, sl=stop_loss, tp=take_profit)
+                    
+                    # Track position details for our own stop loss/take profit logic
+                    self.entry_price = current_price
+                    # For short positions, stop loss is above entry, take profit is below
+                    self.stop_loss_price = stop_loss
+                    self.take_profit_price = take_profit
+                    
+                    if self.__class__.debug:
+                        self.logger.debug(f"SHORT trade executed successfully")
+                except Exception as e:
+                    if self.__class__.debug:
+                        self.logger.debug(f"SHORT trade execution failed: {e}")
+                        
+            else:
+                if self.__class__.debug:
+                    self.logger.debug(f"SHORT signal ignored - already have position")
             
     def _reset_position_tracking(self):
         """Reset position tracking variables."""
