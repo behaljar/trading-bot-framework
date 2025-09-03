@@ -35,6 +35,7 @@ dependencies = [
     "backtesting",
     "seaborn>=0.13.2",
     "pandas-ta>=0.3.14b0",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]

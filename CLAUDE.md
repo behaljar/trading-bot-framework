@@ -8,6 +8,13 @@ This is a comprehensive Python trading framework for algorithmic trading strateg
 
 ## Architecture
 
+### Important Development Notes
+
+**Pandas Resampling:**
+- Use modern pandas resampling frequency strings: `'15min'`, `'4h'`, `'1D'` instead of deprecated `'15T'`, `'4H'`, `'1D'`
+- Avoid deprecated frequency aliases to prevent FutureWarnings
+- Standard frequencies: `'1min'`, `'5min'`, `'15min'`, `'30min'`, `'1h'`, `'4h'`, `'1D'`, `'1W'`
+
 ### Core Components
 
 **Framework Structure:**

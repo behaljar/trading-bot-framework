@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import json
 import warnings
+import time
 
 # Add framework to path
 script_dir = Path(__file__).parent
@@ -125,12 +126,17 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
         raise ValueError(f"Unknown risk manager type: {risk_manager_type}. Available: ['fixed_position', 'fixed_risk', 'strategy_position']")
     
     # Create wrapper strategy class
+    print(f"\n📈 Setting up {strategy_name.upper()} strategy...")
+    print(f"🔧 Creating strategy wrapper...")
+    
     WrapperClass = create_wrapper_class(
         FrameworkStrategyClass, 
         strategy_params,
         risk_manager=risk_manager,
         debug=debug
     )
+    
+    print(f"✅ Strategy wrapper created successfully")
     
     # Create and run backtest
     print(f"\nRunning backtest with strategy: {strategy_name}")
@@ -161,13 +167,52 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
             exclusive_orders=True
         )
     
-    # Run the backtest
-    result = bt.run()
+    # Run the backtest with progress indication
+    print(f"\n{'='*60}")
+    print("🚀 RUNNING BACKTEST...")
+    print(f"📊 Processing {len(data):,} data points...")
+    print(f"📅 Date range: {data.index[0].strftime('%Y-%m-%d %H:%M')} to {data.index[-1].strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*60}")
+    print()  # Extra line for tqdm progress bar
+    
+    start_time = time.time()
+    
+    try:
+        # Run backtest - tqdm will show progress bar automatically if installed
+        result = bt.run()
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"\n✅ Backtest completed successfully!")
+        print(f"⏱️  Execution time: {duration:.2f} seconds")
+        print(f"📈 Processed {len(data)/duration:.0f} data points per second")
+        
+    except Exception as e:
+        print(f"\n❌ Backtest failed: {e}")
+        raise
     
     # Display results
-    print("\n" + "="*60)
-    print(f"BACKTEST RESULTS - {strategy_name.upper()} Strategy")
-    print("="*60)
+    print("\n" + "="*80)
+    print(f"📊 BACKTEST RESULTS - {strategy_name.upper()} Strategy")
+    print("="*80)
+    
+    # Extract key metrics for better formatting
+    total_return = result.get('Return [%]', 0)
+    win_rate = result.get('Win Rate [%]', 0)
+    total_trades = result.get('# Trades', 0)
+    max_dd = result.get('Max. Drawdown [%]', 0)
+    sharpe = result.get('Sharpe Ratio', 0)
+    
+    print(f"🎯 Performance Summary:")
+    print(f"   Total Return: {total_return:.2f}%")
+    print(f"   Win Rate: {win_rate:.1f}%")
+    print(f"   Total Trades: {total_trades}")
+    print(f"   Max Drawdown: {max_dd:.2f}%")
+    print(f"   Sharpe Ratio: {sharpe:.2f}")
+    print()
+    
+    # Full results
+    print("📋 Detailed Results:")
     print(result)
     
     # Save detailed results

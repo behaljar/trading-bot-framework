@@ -54,7 +54,16 @@ class StrategyWrapper(Strategy):
 
         
         # Generate signals for the entire dataset once
-        self.signals = self.strategy.generate_signals(self.framework_data)
+        # Convert backtesting.py data to framework format
+        framework_data = pd.DataFrame({
+            'Open': self.data.Open,
+            'High': self.data.High, 
+            'Low': self.data.Low,
+            'Close': self.data.Close,
+            'Volume': self.data.Volume if hasattr(self.data, 'Volume') else 0
+        }, index=self.data.index)
+        
+        self.signals = self.strategy.generate_signals(framework_data)
         
         # Track current position state for stop loss/take profit
         self.entry_price = None
@@ -94,6 +103,9 @@ class StrategyWrapper(Strategy):
         # Get stop loss and take profit from signal if available
         stop_loss = current_signal_row.get('stop_loss', None)
         take_profit = current_signal_row.get('take_profit', None)
+        
+        # Get trade tag if available
+        trade_tag = current_signal_row.get('tag', None)
         
         # Get strategy's position size if available
         strategy_position_size = current_signal_row.get('position_size', None)
@@ -165,7 +177,7 @@ class StrategyWrapper(Strategy):
                     self.logger.debug(f"Executing LONG trade: size={position_size:.4f}, price={current_price:.6f}, sl={stop_loss}, tp={take_profit}")
                 try:
                     # Open long position
-                    self.buy(size=position_size, sl=stop_loss, tp=take_profit)
+                    self.buy(size=position_size, sl=stop_loss, tp=take_profit, tag=trade_tag)
                     
                     # Track position details for our own stop loss/take profit logic
                     self.entry_price = current_price
@@ -188,7 +200,7 @@ class StrategyWrapper(Strategy):
                     self.logger.debug(f"Executing SHORT trade: size={position_size:.4f}, price={current_price:.6f}, sl={stop_loss}, tp={take_profit}")
                 try:
                     # Open short position
-                    self.sell(size=position_size, sl=stop_loss, tp=take_profit)
+                    self.sell(size=position_size, sl=stop_loss, tp=take_profit, tag=trade_tag)
                     
                     # Track position details for our own stop loss/take profit logic
                     self.entry_price = current_price
