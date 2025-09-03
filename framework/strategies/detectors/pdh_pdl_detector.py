@@ -112,12 +112,12 @@ class PDHPDLDetector:
             day_data = daily_groups.get_group(date)
             
             # Calculate PDH and PDL for this day
-            pdh_price = day_data['high'].max()
-            pdl_price = day_data['low'].min()
+            pdh_price = day_data['High'].max()
+            pdl_price = day_data['Low'].min()
             
             # Find timestamps where these levels occurred
-            pdh_timestamp = day_data[day_data['high'] == pdh_price].index[0]
-            pdl_timestamp = day_data[day_data['low'] == pdl_price].index[0]
+            pdh_timestamp = day_data[day_data['High'] == pdh_price].index[0]
+            pdl_timestamp = day_data[day_data['Low'] == pdl_price].index[0]
             
             period_start = day_data.index[0]
             period_end = day_data.index[-1]
@@ -202,12 +202,12 @@ class PDHPDLDetector:
                 continue  # Skip current and future weeks
             
             # Calculate PWH and PWL for this week
-            pwh_price = week_data['high'].max()
-            pwl_price = week_data['low'].min()
+            pwh_price = week_data['High'].max()
+            pwl_price = week_data['Low'].min()
             
             # Find timestamps where these levels occurred
-            pwh_timestamp = week_data[week_data['high'] == pwh_price].index[0]
-            pwl_timestamp = week_data[week_data['low'] == pwl_price].index[0]
+            pwh_timestamp = week_data[week_data['High'] == pwh_price].index[0]
+            pwl_timestamp = week_data[week_data['Low'] == pwl_price].index[0]
             
             period_start = week_data.index[0]
             period_end = week_data.index[-1]
@@ -301,18 +301,18 @@ class PDHPDLDetector:
         if level.level_type in ['PDH', 'PWH']:
             # For highs, check if price has broken above
             touches = future_data[
-                (future_data['high'] >= level.price * (1 - self.touch_threshold)) &
-                (future_data['high'] <= level.price * (1 + self.touch_threshold))
+                (future_data['High'] >= level.price * (1 - self.touch_threshold)) &
+                (future_data['High'] <= level.price * (1 + self.touch_threshold))
             ]
-            breaks = future_data[future_data['high'] > level.price * (1 + self.break_threshold)]
+            breaks = future_data[future_data['High'] > level.price * (1 + self.break_threshold)]
             
         else:  # PDL, PWL
             # For lows, check if price has broken below
             touches = future_data[
-                (future_data['low'] <= level.price * (1 + self.touch_threshold)) &
-                (future_data['low'] >= level.price * (1 - self.touch_threshold))
+                (future_data['Low'] <= level.price * (1 + self.touch_threshold)) &
+                (future_data['Low'] >= level.price * (1 - self.touch_threshold))
             ]
-            breaks = future_data[future_data['low'] < level.price * (1 - self.break_threshold)]
+            breaks = future_data[future_data['Low'] < level.price * (1 - self.break_threshold)]
         
         # Update touch count
         level.touch_count = len(touches)
@@ -322,18 +322,18 @@ class PDHPDLDetector:
             level.is_claimed = True
             level.claim_timestamp = breaks.index[0]
             if level.level_type in ['PDH', 'PWH']:
-                level.claim_price = breaks.iloc[0]['high']
+                level.claim_price = breaks.iloc[0]['High']
             else:
-                level.claim_price = breaks.iloc[0]['low']
+                level.claim_price = breaks.iloc[0]['Low']
         
         # If not broken but touched multiple times, might still be considered claimed
         elif level.touch_count >= 3:  # Threshold for multiple touches
             level.is_claimed = True
             level.claim_timestamp = touches.index[0]
             if level.level_type in ['PDH', 'PWH']:
-                level.claim_price = touches.iloc[0]['high']
+                level.claim_price = touches.iloc[0]['High']
             else:
-                level.claim_price = touches.iloc[0]['low']
+                level.claim_price = touches.iloc[0]['Low']
     
     def get_levels_near_price(self, 
                              levels: List[HighLowLevel],
@@ -413,7 +413,7 @@ class PDHPDLDetector:
         if data is None or len(data) < 2:
             return False
         
-        required_columns = ['high', 'low', 'open', 'close']
+        required_columns = ['High', 'Low', 'Open', 'Close']
         if not all(col in data.columns for col in required_columns):
             return False
         

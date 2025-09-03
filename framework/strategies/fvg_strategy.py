@@ -115,11 +115,11 @@ class FVGStrategy(BaseStrategy):
         
         # Resample M15 data to H4 for H4 FVG detection
         h4_data = data.resample('4h').agg({
-            'open': 'first',
-            'high': 'max', 
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
         }).dropna()
         
         
@@ -128,11 +128,11 @@ class FVGStrategy(BaseStrategy):
         
         # Resample M15 data to daily for daily open filter
         daily_data = data.resample('D').agg({
-            'open': 'first',
-            'high': 'max', 
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
         }).dropna()
         
         
@@ -162,7 +162,7 @@ class FVGStrategy(BaseStrategy):
                 continue
                 
             current_time = data.index[entry_idx]
-            current_price = data.iloc[entry_idx]['close']
+            current_price = data.iloc[entrCy_idx]['lose']
             
             # Check if we're in an execution window
             if not self._is_execution_window(current_time):
@@ -194,11 +194,11 @@ class FVGStrategy(BaseStrategy):
             if fvg.fvg_type == 'bullish':
                 signal = 1  # Long
                 # Stop loss at low of first candle in FVG formation
-                stop_loss = data.iloc[fvg.start_idx]['low']
+                stop_loss = data.iloc[fvg.start_idx]['Low']
             elif fvg.fvg_type == 'bearish':
                 signal = -1  # Short
                 # Stop loss at high of first candle in FVG formation
-                stop_loss = data.iloc[fvg.start_idx]['high']
+                stop_loss = data.iloc[fvg.start_idx]['High']
             else:
                 continue
             
@@ -329,12 +329,12 @@ class FVGStrategy(BaseStrategy):
             if i + 1 < len(daily_data):
                 next_day_start = daily_data.index[i + 1]
                 if day_start_time <= current_time < next_day_start:
-                    current_daily_open = daily_data.iloc[i]['open']
+                    current_daily_open = daily_data.iloc[i]['Open']
                     break
             else:
                 # Last day in data
                 if day_start_time <= current_time:
-                    current_daily_open = daily_data.iloc[i]['open']
+                    current_daily_open = daily_data.iloc[i]['Open']
                     break
         
         if current_daily_open is None:
@@ -410,8 +410,8 @@ class FVGStrategy(BaseStrategy):
                 
             # Check if any M15 candle from start_search_idx to current_idx touched the H4 FVG
             for i in range(start_search_idx, min(current_idx + 1, len(data))):
-                candle_high = data.iloc[i]['high']
-                candle_low = data.iloc[i]['low']
+                candle_high = data.iloc[i]['High']
+                candle_low = data.iloc[i]['Low']
                 
                 # Check if candle wicked into the H4 FVG
                 if fvg.fvg_type == 'bullish':
@@ -440,8 +440,8 @@ class FVGStrategy(BaseStrategy):
         """
         # Look at all candles from after FVG formation until current candle
         for i in range(fvg_end_idx + 1, min(current_idx, len(data))):
-            candle_high = data.iloc[i]['high']
-            candle_low = data.iloc[i]['low']
+            candle_high = data.iloc[i]['High']
+            candle_low = data.iloc[i]['Low']
             
             # Check if FVG has been fully mitigated
             if fvg.fvg_type == 'bullish':

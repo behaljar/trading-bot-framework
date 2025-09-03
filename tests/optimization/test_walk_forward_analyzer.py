@@ -27,11 +27,11 @@ class TestWalkForwardAnalyzer:
         prices = base_price + trend + noise
         
         return pd.DataFrame({
-            'open': prices * 0.999,
-            'high': prices * 1.002,
-            'low': prices * 0.998,
-            'close': prices,
-            'volume': np.random.uniform(1000, 5000, length)
+            'Open': prices * 0.999,
+            'High': prices * 1.002,
+            'Low': prices * 0.998,
+            'Close': prices,
+            'Volume': np.random.uniform(1000, 5000, length)
         }, index=dates)
 
     def create_param_config(self):
@@ -354,8 +354,8 @@ class TestWalkForwardAnalyzer:
         
         # Test with non-datetime index
         invalid_data = pd.DataFrame({
-            'open': [100, 101, 102],
-            'close': [100, 101, 102]
+            'Open': [100, 101, 102],
+            'Close': [100, 101, 102]
         })
         
         with pytest.raises(ValueError, match="Data must have DatetimeIndex"):

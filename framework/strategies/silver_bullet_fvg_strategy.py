@@ -20,7 +20,7 @@ import pytz
 import hashlib
 from .base_strategy import BaseStrategy
 from .detectors.fvg_detector import FVGDetector
-from .detectors.pivot_detector import PivotDetector
+from .detectors.swing_detector import SwingDetector
 from .detectors.bos_choch_unified_detector import BoSCHoCHDetector
 
 
@@ -89,7 +89,7 @@ class SilverBulletFVGStrategy(BaseStrategy):
         
         # Initialize detectors
         self.fvg_detector = FVGDetector(min_sensitivity=min_fvg_sensitivity)
-        self.pivot_detector = PivotDetector()
+        self.swing_detector = SwingDetector()
         self.bos_choch_detector = BoSCHoCHDetector(left_bars=swing_length, right_bars=swing_length)
         
         # Execution windows in NY timezone (24-hour format)
@@ -146,11 +146,11 @@ class SilverBulletFVGStrategy(BaseStrategy):
         else:
             # Resample to M15 for context FVGs
             m15_data = data.resample('15min').agg({
-                'open': 'first',
-                'high': 'max', 
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
+                'Open': 'first',
+                'High': 'max', 
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
             }).dropna()
             
             # Detect M15 FVGs for context
@@ -174,10 +174,10 @@ class SilverBulletFVGStrategy(BaseStrategy):
             return signals_df
         
         # Extract OHLC arrays for fast access
-        open_arr = data['open'].values
-        high_arr = data['high'].values
-        low_arr = data['low'].values
-        close_arr = data['close'].values
+        open_arr = data['Open'].values
+        high_arr = data['High'].values
+        low_arr = data['Low'].values
+        close_arr = data['Close'].values
         
         # Precompute session keys for vectorized one-trade-per-session
         session_keys = self._compute_session_keys(ny_timestamps, in_window_mask)
@@ -368,8 +368,8 @@ class SilverBulletFVGStrategy(BaseStrategy):
             return m1_fvg_indices
         
         # Get arrays for fast access
-        high_arr = data['high'].values
-        low_arr = data['low'].values
+        high_arr = data['High'].values
+        low_arr = data['Low'].values
         
         # Check each potential 3-candle FVG pattern
         for i in range(2, len(data)):
@@ -476,8 +476,8 @@ class SilverBulletFVGStrategy(BaseStrategy):
         Check if an FVG is unmitigated (optimized with arrays).
         """
         # Get arrays for fast access
-        high_arr = data['high'].values
-        low_arr = data['low'].values
+        high_arr = data['High'].values
+        low_arr = data['Low'].values
         
         # Look at all candles from after FVG formation until current candle
         for i in range(fvg_end_idx + 1, min(current_idx, len(data))):
@@ -507,8 +507,8 @@ class SilverBulletFVGStrategy(BaseStrategy):
         """
         # Look at all candles from after FVG formation until current candle
         for i in range(fvg_end_idx + 1, min(current_idx, len(data))):
-            candle_high = data.iloc[i]['high']
-            candle_low = data.iloc[i]['low']
+            candle_high = data.iloc[i]['High']
+            candle_low = data.iloc[i]['Low']
             
             # Check if FVG has been fully mitigated
             if fvg.fvg_type == 'bullish':
@@ -530,7 +530,7 @@ class SilverBulletFVGStrategy(BaseStrategy):
         if not self.use_swing_hl_filter and not self.use_bos_choch_filter and not self.use_liquidity_filter:
             return True
         
-        # Check swing filter using PivotDetector
+        # Check swing filter using SwingDetector
         if self.use_swing_hl_filter:
             if not self._check_swing_filter_proper(m15_data, current_time, direction):
                 return False
@@ -548,7 +548,7 @@ class SilverBulletFVGStrategy(BaseStrategy):
         return True
     
     def _check_swing_filter_proper(self, m15_data: pd.DataFrame, current_time: pd.Timestamp, direction: str) -> bool:
-        """Check swing filter using PivotDetector."""
+        """Check swing filter using SwingDetector."""
         if len(m15_data) < self.swing_length * 4:
             return True  # Not enough data, allow trade
         
@@ -558,15 +558,15 @@ class SilverBulletFVGStrategy(BaseStrategy):
         
         if direction == 'bullish' and self.require_swing_low_for_long:
             # Find pivot lows in recent data
-            pivot_lows = self.pivot_detector.find_all_pivot_lows(
-                recent_data['low'], self.swing_length, self.swing_length
+            pivot_lows = self.swing_detector.find_all_pivot_lows(
+                recent_data['Low'], self.swing_length, self.swing_length
             )
             return len(pivot_lows) > 0
         
         elif direction == 'bearish' and self.require_swing_high_for_short:
             # Find pivot highs in recent data  
-            pivot_highs = self.pivot_detector.find_all_pivot_highs(
-                recent_data['high'], self.swing_length, self.swing_length
+            pivot_highs = self.swing_detector.find_all_pivot_highs(
+                recent_data['High'], self.swing_length, self.swing_length
             )
             return len(pivot_highs) > 0
         
@@ -628,11 +628,11 @@ class SilverBulletFVGStrategy(BaseStrategy):
         recent_data = m15_data.tail(self.liquidity_lookback_candles)
         
         # Calculate volume threshold (2x average volume indicates potential liquidity sweep)
-        avg_volume = recent_data['volume'].mean()
+        avg_volume = recent_data['Volume'].mean()
         volume_threshold = avg_volume * 2.0
         
         # Look for high volume candles (liquidity sweeps)
-        high_volume_candles = recent_data[recent_data['volume'] > volume_threshold]
+        high_volume_candles = recent_data[recent_data['Volume'] > volume_threshold]
         
         return len(high_volume_candles) > 0
     

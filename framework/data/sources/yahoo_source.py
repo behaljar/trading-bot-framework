@@ -23,16 +23,7 @@ class YahooFinanceSource(DataSource):
             ticker = yf.Ticker(symbol)
             data = ticker.history(start=start_date, end=end_date, interval=interval)
 
-            # Standardize column names to lowercase
             if not data.empty:
-                # Rename columns to lowercase
-                data = data.rename(columns={
-                    'Open': 'open',
-                    'High': 'high', 
-                    'Low': 'low',
-                    'Close': 'close',
-                    'Volume': 'volume'
-                })
                 data.index.name = 'timestamp'
 
             return data
@@ -48,8 +39,8 @@ class YahooFinanceSource(DataSource):
             # Use lowercase column name
             if 'Close' in current_data.columns:
                 return float(current_data['Close'].iloc[-1])
-            elif 'close' in current_data.columns:
-                return float(current_data['close'].iloc[-1])
+            elif 'Close' in current_data.columns:
+                return float(current_data['Close'].iloc[-1])
             else:
                 return 0.0
         except Exception as e:

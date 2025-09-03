@@ -109,12 +109,12 @@ class FVGDetector:
         
         A bullish FVG occurs when high[i-1] < low[i+1], creating an upward gap.
         """
-        prev_high = data.iloc[i-1]['high']
-        curr_open = data.iloc[i]['open']
-        curr_close = data.iloc[i]['close']
-        curr_high = data.iloc[i]['high']
-        curr_low = data.iloc[i]['low']
-        next_low = data.iloc[i+1]['low']
+        prev_high = data.iloc[i-1]['High']
+        curr_open = data.iloc[i]['Open']
+        curr_close = data.iloc[i]['Close']
+        curr_high = data.iloc[i]['High']
+        curr_low = data.iloc[i]['Low']
+        next_low = data.iloc[i+1]['Low']
         
         # Check if there's a gap (bullish FVG condition)
         if prev_high < next_low:
@@ -149,12 +149,12 @@ class FVGDetector:
         
         A bearish FVG occurs when low[i-1] > high[i+1], creating a downward gap.
         """
-        prev_low = data.iloc[i-1]['low']
-        curr_open = data.iloc[i]['open']
-        curr_close = data.iloc[i]['close']
-        curr_high = data.iloc[i]['high']
-        curr_low = data.iloc[i]['low']
-        next_high = data.iloc[i+1]['high']
+        prev_low = data.iloc[i-1]['Low']
+        curr_open = data.iloc[i]['Open']
+        curr_close = data.iloc[i]['Close']
+        curr_high = data.iloc[i]['High']
+        curr_low = data.iloc[i]['Low']
+        next_high = data.iloc[i+1]['High']
         
         # Check if there's a gap (bearish FVG condition)
         if prev_low > next_high:
@@ -321,7 +321,7 @@ class FVGDetector:
         if data is None or len(data) < 3:
             return False
         
-        required_columns = ['open', 'high', 'low', 'close']
+        required_columns = ['Open', 'High', 'Low', 'Close']
         if not all(col in data.columns for col in required_columns):
             return False
         

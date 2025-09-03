@@ -27,14 +27,13 @@ class OhlcValidatorPreprocessor(BasePreprocessor):
             return df
         
         # Check if OHLC columns exist (case-insensitive)
-        df_cols_lower = [col.lower() for col in df.columns]
-        required_cols = ['open', 'high', 'low', 'close']
+        required_cols = ['Open', 'High', 'Low', 'Close']
         
         # Find actual column names
         ohlc_cols = {}
         for req_col in required_cols:
             for actual_col in df.columns:
-                if actual_col.lower() == req_col:
+                if actual_col.lower() == req_col.lower():
                     ohlc_cols[req_col] = actual_col
                     break
         
@@ -48,8 +47,8 @@ class OhlcValidatorPreprocessor(BasePreprocessor):
         invalid_count = 0
         
         # Validate High >= Low
-        high_col = ohlc_cols['high']
-        low_col = ohlc_cols['low']
+        high_col = ohlc_cols['High']
+        low_col = ohlc_cols['Low']
         invalid_high_low = df_clean[high_col] < df_clean[low_col]
         if invalid_high_low.any():
             count = invalid_high_low.sum()
@@ -59,8 +58,8 @@ class OhlcValidatorPreprocessor(BasePreprocessor):
             invalid_count += count
         
         # Validate High >= Open and High >= Close
-        open_col = ohlc_cols['open']
-        close_col = ohlc_cols['close']
+        open_col = ohlc_cols['Open']
+        close_col = ohlc_cols['Close']
         
         invalid_high_open = df_clean[high_col] < df_clean[open_col]
         if invalid_high_open.any():

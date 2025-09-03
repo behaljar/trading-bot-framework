@@ -55,11 +55,11 @@ class TestFVGDetector:
             closes.append(target_close)
         
         self.sample_data = pd.DataFrame({
-            'open': opens,
-            'high': highs,
-            'low': lows,
-            'close': closes,
-            'volume': [1000 + i * 50 for i in range(20)]  # Varying volume
+            'Open': opens,
+            'High': highs,
+            'Low': lows,
+            'Close': closes,
+            'Volume': [1000 + i * 50 for i in range(20)]  # Varying volume
         }, index=dates)
         
         # Create data with specific FVG scenarios (realistic OHLCV)
@@ -70,11 +70,11 @@ class TestFVGDetector:
         fvg_lows = [99.0, 100.0, 102.0, 102.5, 104.0, 104.5, 106.0]
         
         self.fvg_test_data = pd.DataFrame({
-            'open': fvg_opens,
-            'high': fvg_highs,
-            'low': fvg_lows,
-            'close': fvg_closes,
-            'volume': [1000 + i * 100 for i in range(7)]
+            'Open': fvg_opens,
+            'High': fvg_highs,
+            'Low': fvg_lows,
+            'Close': fvg_closes,
+            'Volume': [1000 + i * 100 for i in range(7)]
         })
         
     def test_bullish_fvg_detection(self):
@@ -82,11 +82,11 @@ class TestFVGDetector:
         # Create specific data for bullish FVG: high[i-1] < low[i+1]
         # Realistic: open[1] = close[0], open[2] = close[1]
         test_data = pd.DataFrame({
-            'open': [100.0, 101.0, 106.0],    # open[i] = close[i-1]
-            'high': [102.0, 107.0, 108.0],    # high[0] = 102, low[2] = 107, gap exists
-            'low': [99.0, 100.5, 107.0],      # gap between high[0]=102 and low[2]=107
-            'close': [101.0, 106.0, 107.5],   
-            'volume': [1000] * 3
+            'Open': [100.0, 101.0, 106.0],    # open[i] = close[i-1]
+            'High': [102.0, 107.0, 108.0],    # high[0] = 102, low[2] = 107, gap exists
+            'Low': [99.0, 100.5, 107.0],      # gap between high[0]=102 and low[2]=107
+            'Close': [101.0, 106.0, 107.5],   
+            'Volume': [1000] * 3
         })
         
         fvg = self.detector._detect_bullish_fvg(test_data, 1)
@@ -100,11 +100,11 @@ class TestFVGDetector:
         # Create specific data for bearish FVG: low[i-1] > high[i+1]
         # Realistic: open[i] = close[i-1] and proper OHLC relationships
         test_data = pd.DataFrame({
-            'open': [110.0, 108.0, 103.0],    # open[i] = close[i-1]
-            'high': [112.0, 109.0, 105.0],    # low[0] = 108, high[2] = 105, gap exists
-            'low': [108.0, 102.0, 103.0],     # gap between low[0]=108 and high[2]=105
-            'close': [108.0, 103.0, 104.0],   
-            'volume': [1000] * 3
+            'Open': [110.0, 108.0, 103.0],    # open[i] = close[i-1]
+            'High': [112.0, 109.0, 105.0],    # low[0] = 108, high[2] = 105, gap exists
+            'Low': [108.0, 102.0, 103.0],     # gap between low[0]=108 and high[2]=105
+            'Close': [108.0, 103.0, 104.0],   
+            'Volume': [1000] * 3
         })
         
         fvg = self.detector._detect_bearish_fvg(test_data, 1)
@@ -117,11 +117,11 @@ class TestFVGDetector:
         """Test when no FVG should be detected"""
         # Create data with no gaps - realistic OHLCV
         test_data = pd.DataFrame({
-            'open': [100.0, 101.0, 102.0],    # open[i] = close[i-1]
-            'high': [102.0, 103.0, 104.0],    # Overlapping ranges
-            'low': [99.0, 100.5, 101.5],      # high[0]=102, low[2]=101.5 - overlapping
-            'close': [101.0, 102.0, 103.0],   
-            'volume': [1000] * 3
+            'Open': [100.0, 101.0, 102.0],    # open[i] = close[i-1]
+            'High': [102.0, 103.0, 104.0],    # Overlapping ranges
+            'Low': [99.0, 100.5, 101.5],      # high[0]=102, low[2]=101.5 - overlapping
+            'Close': [101.0, 102.0, 103.0],   
+            'Volume': [1000] * 3
         })
         
         bullish_fvg = self.detector._detect_bullish_fvg(test_data, 1)
@@ -134,11 +134,11 @@ class TestFVGDetector:
         """Test sensitivity-based filtering"""
         # Create FVG with small gap relative to middle candle - realistic OHLCV
         test_data = pd.DataFrame({
-            'open': [100.0, 100.2, 105.0],    # open[i] = close[i-1]
-            'high': [100.5, 110.0, 105.5],    # Middle candle is large (20 points)
-            'low': [99.5, 90.0, 104.8],       # Gap between high[0]=100.5 and low[2]=104.8
-            'close': [100.2, 105.0, 105.2],   # Gap is large (4.3 points)
-            'volume': [1000] * 3
+            'Open': [100.0, 100.2, 105.0],    # open[i] = close[i-1]
+            'High': [100.5, 110.0, 105.5],    # Middle candle is large (20 points)
+            'Low': [99.5, 90.0, 104.8],       # Gap between high[0]=100.5 and low[2]=104.8
+            'Close': [100.2, 105.0, 105.2],   # Gap is large (4.3 points)
+            'Volume': [1000] * 3
         })
         
         # With high sensitivity requirement, should not detect
@@ -167,11 +167,11 @@ class TestFVGDetector:
         """Test FVG merging logic"""
         # Create data with consecutive FVGs that should be merged
         merge_data = pd.DataFrame({
-            'open': [100, 105, 102, 107, 104, 109, 106],
-            'high': [102, 107, 104, 109, 106, 111, 108],
-            'low': [98, 103, 105, 105, 107, 107, 104],  # Consecutive gaps
-            'close': [101, 106, 103, 108, 105, 110, 107],
-            'volume': [1000] * 7
+            'Open': [100, 105, 102, 107, 104, 109, 106],
+            'High': [102, 107, 104, 109, 106, 111, 108],
+            'Low': [98, 103, 105, 105, 107, 107, 104],  # Consecutive gaps
+            'Close': [101, 106, 103, 108, 105, 110, 107],
+            'Volume': [1000] * 7
         })
         
         # Test without merging
@@ -212,11 +212,11 @@ class TestFVGDetector:
         
         # Test with insufficient data
         small_data = pd.DataFrame({
-            'open': [100, 101],
-            'high': [102, 103],
-            'low': [98, 99],
-            'close': [101, 102],
-            'volume': [1000, 1000]
+            'Open': [100, 101],
+            'High': [102, 103],
+            'Low': [98, 99],
+            'Close': [101, 102],
+            'Volume': [1000, 1000]
         })
         fvgs = self.detector.detect_fvgs(small_data)
         assert fvgs == []
@@ -224,7 +224,7 @@ class TestFVGDetector:
         # Test with missing columns
         bad_data = pd.DataFrame({
             'price': [100, 101, 102],
-            'volume': [1000, 1000, 1000]
+            'Volume': [1000, 1000, 1000]
         })
         fvgs = self.detector.detect_fvgs(bad_data)
         assert fvgs == []
@@ -255,11 +255,11 @@ class TestFVGDetector:
         
         # Plot candlesticks
         for i, (index, row) in enumerate(self.sample_data.iterrows()):
-            color = 'green' if row['close'] >= row['open'] else 'red'
+            color = 'green' if row['Close'] >= row['Open'] else 'red'
             
             # Candlestick body
-            body_height = abs(row['close'] - row['open'])
-            body_bottom = min(row['close'], row['open'])
+            body_height = abs(row['Close'] - row['Open'])
+            body_bottom = min(row['Close'], row['Open'])
             
             # Draw body
             rect = Rectangle((i - 0.3, body_bottom), 0.6, body_height, 
@@ -267,8 +267,8 @@ class TestFVGDetector:
             ax.add_patch(rect)
             
             # Draw wicks
-            ax.plot([i, i], [row['low'], min(row['open'], row['close'])], 'k-', linewidth=1)
-            ax.plot([i, i], [max(row['open'], row['close']), row['high']], 'k-', linewidth=1)
+            ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
+            ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
         
         # Highlight FVGs
         bullish_plotted = False
@@ -375,11 +375,11 @@ class TestFVGDetector:
             
             # Rename columns to match expected format
             data = data.rename(columns={
-                'Open': 'open',
-                'High': 'high', 
-                'Low': 'low',
-                'Close': 'close',
-                'Volume': 'volume'
+                'Open': 'Open',
+                'High': 'High', 
+                'Low': 'Low',
+                'Close': 'Close',
+                'Volume': 'Volume'
             })
             
             # Sample data to manageable size for visualization
@@ -399,11 +399,11 @@ class TestFVGDetector:
             sample_data = data.iloc[::sample_step].reset_index(drop=True)
             
             for i, (index, row) in enumerate(sample_data.iterrows()):
-                color = 'green' if row['close'] >= row['open'] else 'red'
+                color = 'green' if row['Close'] >= row['Open'] else 'red'
                 
                 # Candlestick body
-                body_height = abs(row['close'] - row['open'])
-                body_bottom = min(row['close'], row['open'])
+                body_height = abs(row['Close'] - row['Open'])
+                body_bottom = min(row['Close'], row['Open'])
                 
                 # Draw body
                 rect = Rectangle((i - 0.3, body_bottom), 0.6, body_height, 
@@ -411,8 +411,8 @@ class TestFVGDetector:
                 ax.add_patch(rect)
                 
                 # Draw wicks
-                ax.plot([i, i], [row['low'], min(row['open'], row['close'])], 'k-', linewidth=1)
-                ax.plot([i, i], [max(row['open'], row['close']), row['high']], 'k-', linewidth=1)
+                ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
+                ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
             
             # Highlight FVGs (scale indices to match sample)
             bullish_plotted = False

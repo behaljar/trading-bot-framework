@@ -1,6 +1,6 @@
 import sys; import os; sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 """
-Test cases for pivot detector with candlestick visualization
+Test cases for swing detector with candlestick visualization
 """
 
 import pytest
@@ -13,15 +13,15 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import os
 
-from framework.strategies.detectors.pivot_detector import PivotDetector
+from framework.strategies.detectors.swing_detector import SwingDetector
 
 
-class TestPivotDetector:
-    """Test cases for PivotDetector class"""
+class TestSwingDetector:
+    """Test cases for SwingDetector class"""
     
     def setup_method(self):
         """Setup test fixtures"""
-        self.detector = PivotDetector()
+        self.detector = SwingDetector()
         
         # Create sample data for testing
         self.sample_highs = [100, 105, 110, 108, 106, 104, 107, 109, 111, 108, 106, 103, 105, 108, 110]
@@ -37,58 +37,58 @@ class TestPivotDetector:
             'Close': [h - 1 for h in self.sample_highs]
         })
         
-    def test_pivot_high_detection(self):
-        """Test pivot high detection"""
-        # Test with known pivot high
-        test_series = [100, 105, 110, 108, 106]  # 110 should be pivot high with left=2, right=2
-        result = self.detector.pivot_high(test_series, left_bars=2, right_bars=2)
+    def test_swing_high_detection(self):
+        """Test swing high detection"""
+        # Test with known swing high
+        test_series = [100, 105, 110, 108, 106]  # 110 should be swing high with left=2, right=2
+        result = self.detector.swing_high(test_series, left_bars=2, right_bars=2)
         assert result == 110
         
-        # Test with no pivot high
-        test_series = [100, 105, 108, 110, 112]  # No pivot high (increasing)
-        result = self.detector.pivot_high(test_series, left_bars=2, right_bars=2)
+        # Test with no swing high
+        test_series = [100, 105, 108, 110, 112]  # No swing high (increasing)
+        result = self.detector.swing_high(test_series, left_bars=2, right_bars=2)
         assert result is None
         
-    def test_pivot_low_detection(self):
-        """Test pivot low detection"""
-        # Test with known pivot low
-        test_series = [105, 102, 98, 101, 104]  # 98 should be pivot low with left=2, right=2
-        result = self.detector.pivot_low(test_series, left_bars=2, right_bars=2)
+    def test_swing_low_detection(self):
+        """Test swing low detection"""
+        # Test with known swing low
+        test_series = [105, 102, 98, 101, 104]  # 98 should be swing low with left=2, right=2
+        result = self.detector.swing_low(test_series, left_bars=2, right_bars=2)
         assert result == 98
         
-        # Test with no pivot low
-        test_series = [105, 102, 98, 95, 90]  # No pivot low (decreasing)
-        result = self.detector.pivot_low(test_series, left_bars=2, right_bars=2)
+        # Test with no swing low
+        test_series = [105, 102, 98, 95, 90]  # No swing low (decreasing)
+        result = self.detector.swing_low(test_series, left_bars=2, right_bars=2)
         assert result is None
         
     def test_input_validation(self):
         """Test input validation"""
         # Test with empty series
-        result = self.detector.pivot_high([], left_bars=2, right_bars=2)
+        result = self.detector.swing_high([], left_bars=2, right_bars=2)
         assert result is None
         
         # Test with invalid bar counts
-        result = self.detector.pivot_high(self.sample_highs, left_bars=0, right_bars=2)
+        result = self.detector.swing_high(self.sample_highs, left_bars=0, right_bars=2)
         assert result is None
         
-        result = self.detector.pivot_high(self.sample_highs, left_bars=2, right_bars=0)
+        result = self.detector.swing_high(self.sample_highs, left_bars=2, right_bars=0)
         assert result is None
         
-    def test_find_all_pivots(self):
-        """Test finding all pivot points"""
-        # Test finding all pivot highs
-        pivot_highs = self.detector.find_all_pivot_highs(self.sample_highs, left_bars=2, right_bars=2)
-        assert len(pivot_highs) > 0
+    def test_find_all_swings(self):
+        """Test finding all swing points"""
+        # Test finding all swing highs
+        swing_highs = self.detector.find_all_swing_highs(self.sample_highs, left_bars=2, right_bars=2)
+        assert len(swing_highs) > 0
         
-        # Test finding all pivot lows
-        pivot_lows = self.detector.find_all_pivot_lows(self.sample_lows, left_bars=2, right_bars=2)
-        assert len(pivot_lows) > 0
+        # Test finding all swing lows
+        swing_lows = self.detector.find_all_swing_lows(self.sample_lows, left_bars=2, right_bars=2)
+        assert len(swing_lows) > 0
         
-        # Verify pivot values are correct
-        for index, value in pivot_highs:
+        # Verify swing values are correct
+        for index, value in swing_highs:
             assert value == self.sample_highs[index]
             
-        for index, value in pivot_lows:
+        for index, value in swing_lows:
             assert value == self.sample_lows[index]
             
     def test_with_real_data(self):
@@ -104,23 +104,23 @@ class TestPivotDetector:
             
             if not data.empty:
                 # Test with real high/low data
-                pivot_highs = self.detector.find_all_pivot_highs(data['High'].values, left_bars=5, right_bars=5)
-                pivot_lows = self.detector.find_all_pivot_lows(data['Low'].values, left_bars=5, right_bars=5)
+                swing_highs = self.detector.find_all_swing_highs(data['High'].values, left_bars=5, right_bars=5)
+                swing_lows = self.detector.find_all_swing_lows(data['Low'].values, left_bars=5, right_bars=5)
                 
-                # Should find some pivots in 90 days of data
-                assert len(pivot_highs) >= 0  # Could be 0 if no pivots found
-                assert len(pivot_lows) >= 0   # Could be 0 if no pivots found
+                # Should find some swings in 90 days of data
+                assert len(swing_highs) >= 0  # Could be 0 if no swings found
+                assert len(swing_lows) >= 0   # Could be 0 if no swings found
                 
         except Exception as e:
             # Skip if unable to fetch data
             pytest.skip(f"Unable to fetch real data: {e}")
             
     def test_candlestick_visualization(self):
-        """Test candlestick visualization with pivot points"""
-        # Find pivot points
+        """Test candlestick visualization with swing points"""
+        # Find swing points
         left_bars, right_bars = 2, 2
-        pivot_highs = self.detector.find_all_pivot_highs(self.ohlc_data['High'].values, left_bars, right_bars)
-        pivot_lows = self.detector.find_all_pivot_lows(self.ohlc_data['Low'].values, left_bars, right_bars)
+        swing_highs = self.detector.find_all_swing_highs(self.ohlc_data['High'].values, left_bars, right_bars)
+        swing_lows = self.detector.find_all_swing_lows(self.ohlc_data['Low'].values, left_bars, right_bars)
         
         # Create candlestick chart
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -142,20 +142,20 @@ class TestPivotDetector:
             ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
             ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
         
-        # Highlight pivot highs
-        for index, value in pivot_highs:
+        # Highlight swing highs
+        for index, value in swing_highs:
             if index < len(self.ohlc_data):
                 ax.scatter(index, value, color='blue', s=100, marker='^', 
-                          label='Pivot High' if index == pivot_highs[0][0] else "")
+                          label='Pivot High' if index == swing_highs[0][0] else "")
                 ax.annotate(f'PH: {value:.1f}', (index, value), 
                            xytext=(5, 10), textcoords='offset points', 
                            fontsize=8, color='blue')
         
-        # Highlight pivot lows
-        for index, value in pivot_lows:
+        # Highlight swing lows
+        for index, value in swing_lows:
             if index < len(self.ohlc_data):
                 ax.scatter(index, value, color='purple', s=100, marker='v', 
-                          label='Pivot Low' if index == pivot_lows[0][0] else "")
+                          label='Pivot Low' if index == swing_lows[0][0] else "")
                 ax.annotate(f'PL: {value:.1f}', (index, value), 
                            xytext=(5, -15), textcoords='offset points', 
                            fontsize=8, color='purple')
@@ -178,12 +178,12 @@ class TestPivotDetector:
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         output_dir = os.path.join(project_root, 'output', 'tests')
         os.makedirs(output_dir, exist_ok=True)
-        plot_path = os.path.join(output_dir, 'pivot_detection_test.png')
+        plot_path = os.path.join(output_dir, 'swing_detection_test.png')
         plt.savefig(plot_path, dpi=150, bbox_inches='tight')
         plt.close()
         
-        print(f"Candlestick chart with pivot points saved to: {plot_path}")
-        print(f"Found {len(pivot_highs)} pivot highs and {len(pivot_lows)} pivot lows")
+        print(f"Candlestick chart with swing points saved to: {plot_path}")
+        print(f"Found {len(swing_highs)} swing highs and {len(swing_lows)} swing lows")
         
         # Verify we created the visualization
         assert os.path.exists(plot_path)
@@ -195,7 +195,7 @@ class TestPivotDetector:
             import sys
             import os
             sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            from framework.data.ccxt_source import CCXTSource
+            from framework.data.sources.ccxt_source import CCXTSource
             
             # Fetch real BTC/USDT data from Binance
             source = CCXTSource(
@@ -223,10 +223,10 @@ class TestPivotDetector:
             
             # CCXT data comes with clean column names, no need to handle multi-level columns
             
-            # Find pivot points
+            # Find swing points
             left_bars, right_bars = 25, 25
-            pivot_highs = self.detector.find_all_pivot_highs(data['High'].values, left_bars, right_bars)
-            pivot_lows = self.detector.find_all_pivot_lows(data['Low'].values, left_bars, right_bars)
+            swing_highs = self.detector.find_all_swing_highs(data['High'].values, left_bars, right_bars)
+            swing_lows = self.detector.find_all_swing_lows(data['Low'].values, left_bars, right_bars)
             
             # Create candlestick chart
             fig, ax = plt.subplots(figsize=(15, 10))
@@ -248,27 +248,27 @@ class TestPivotDetector:
                 ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
                 ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
             
-            # Highlight pivot highs
-            pivot_high_plotted = False
-            for index, value in pivot_highs:
+            # Highlight swing highs
+            swing_high_plotted = False
+            for index, value in swing_highs:
                 if index < len(data):
                     ax.scatter(index, value, color='blue', s=150, marker='^', 
-                              label='Pivot High' if not pivot_high_plotted else "", zorder=5)
+                              label='Pivot High' if not swing_high_plotted else "", zorder=5)
                     ax.annotate(f'${value:.2f}', (index, value), 
                                xytext=(5, 10), textcoords='offset points', 
                                fontsize=9, color='blue', weight='bold')
-                    pivot_high_plotted = True
+                    swing_high_plotted = True
             
-            # Highlight pivot lows
-            pivot_low_plotted = False
-            for index, value in pivot_lows:
+            # Highlight swing lows
+            swing_low_plotted = False
+            for index, value in swing_lows:
                 if index < len(data):
                     ax.scatter(index, value, color='purple', s=150, marker='v', 
-                              label='Pivot Low' if not pivot_low_plotted else "", zorder=5)
+                              label='Pivot Low' if not swing_low_plotted else "", zorder=5)
                     ax.annotate(f'${value:.2f}', (index, value), 
                                xytext=(5, -15), textcoords='offset points', 
                                fontsize=9, color='purple', weight='bold')
-                    pivot_low_plotted = True
+                    swing_low_plotted = True
             
             # Formatting
             symbol = "BTC/USDT"
@@ -276,7 +276,7 @@ class TestPivotDetector:
             ax.set_ylabel('Price ($)')
             ax.set_title(f'{symbol} - Candlestick Chart with Pivot Points (L:{left_bars}, R:{right_bars})')
             ax.grid(True, alpha=0.3)
-            if pivot_high_plotted or pivot_low_plotted:
+            if swing_high_plotted or swing_low_plotted:
                 ax.legend()
             
             # Set x-axis labels using timestamp column
@@ -291,12 +291,12 @@ class TestPivotDetector:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             output_dir = os.path.join(project_root, 'output', 'tests')
             os.makedirs(output_dir, exist_ok=True)
-            plot_path = os.path.join(output_dir, f'pivot_detection_btc_usdt_real.png')
+            plot_path = os.path.join(output_dir, f'swing_detection_btc_usdt_real.png')
             plt.savefig(plot_path, dpi=150, bbox_inches='tight')
             plt.close()
             
             print(f"Real data candlestick chart saved to: {plot_path}")
-            print(f"Found {len(pivot_highs)} pivot highs and {len(pivot_lows)} pivot lows in {symbol}")
+            print(f"Found {len(swing_highs)} swing highs and {len(swing_lows)} swing lows in {symbol}")
             
             # Verify we created the visualization
             assert os.path.exists(plot_path)
@@ -307,17 +307,20 @@ class TestPivotDetector:
 
 if __name__ == "__main__":
     # Run tests with visualization
-    test_instance = TestPivotDetector()
+    test_instance = TestSwingDetector()
     test_instance.setup_method()
     
     # Run basic tests
-    test_instance.test_pivot_high_detection()
-    test_instance.test_pivot_low_detection()
+    test_instance.test_swing_high_detection()
+    test_instance.test_swing_low_detection()
     test_instance.test_input_validation()
-    test_instance.test_find_all_pivots()
+    test_instance.test_find_all_swings()
     
     # Run visualization tests
     test_instance.test_candlestick_visualization()
-    test_instance.test_real_data_visualization()
+    try:
+        test_instance.test_real_data_visualization()
+    except Exception as e:
+        print(f"Skipped real data visualization test: {e}")
     
     print("All tests completed successfully!")

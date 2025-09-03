@@ -22,7 +22,6 @@ from framework.optimization.grid_search import GridSearchOptimizer
 from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
-from framework.strategies.ict_silver_bullet_strategy import ICTSilverBulletStrategy
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
 from framework.utils.logger import setup_logger
@@ -50,14 +49,6 @@ def get_default_param_config(strategy: str) -> dict:
             'medium_trend_threshold': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02},
             'relative_volume_threshold': {'type': 'float', 'min': 1.2, 'max': 3.0, 'step': 0.4},
             'cooldown_periods': {'type': 'int', 'min': 2, 'max': 20, 'step': 6}
-        },
-        'ict_silver_bullet': {
-            'risk_reward_ratio': {'type': 'float', 'min': 1.5, 'max': 3.5, 'step': 0.5},
-            'min_fvg_size_pct': {'type': 'float', 'min': 0.0001, 'max': 0.0005, 'step': 0.0001},
-            'enable_london_open': {'type': 'bool', 'values': [True, False]},
-            'enable_ny_open': {'type': 'bool', 'values': [True, False]},
-            'enable_ny_pm': {'type': 'bool', 'values': [True, False]},
-            'min_liquidity_strength': {'type': 'int', 'min': 2, 'max': 4, 'step': 1}
         }
     }
     return configs.get(strategy, {})
@@ -90,7 +81,7 @@ def main():
     
     # Strategy selection
     parser.add_argument('--strategy', type=str, required=True,
-                       choices=['sma', 'fvg', 'breakout', 'ict_silver_bullet'],
+                       choices=['sma', 'fvg', 'breakout'],
                        help='Strategy to optimize')
     
     # Data parameters
@@ -167,8 +158,7 @@ def main():
     strategy_map = {
         'sma': SMAStrategy,
         'fvg': FVGStrategy,
-        'breakout': BreakoutStrategy,
-        'ict_silver_bullet': ICTSilverBulletStrategy
+        'breakout': BreakoutStrategy
     }
     strategy_class = strategy_map[args.strategy]
     

@@ -55,15 +55,14 @@ def load_data(file_path: str, start_date: Optional[str] = None,
     if end_date:
         df = df[df.index <= end_date]
     
-    # Ensure we have the required columns (lowercase for framework)
-    required_cols = ['open', 'high', 'low', 'close', 'volume']
+    required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     
     print(f"Loaded {len(df)} data points")
     print(f"Data range: {df.index[0]} to {df.index[-1]}")
-    print(f"Price range: ${df['close'].min():.2f} - ${df['close'].max():.2f}")
+    print(f"Price range: ${df['Close'].min():.2f} - ${df['Close'].max():.2f}")
     
     return df
 

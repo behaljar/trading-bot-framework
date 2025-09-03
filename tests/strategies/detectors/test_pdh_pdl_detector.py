@@ -96,7 +96,7 @@ class TestPDHPDLDetector:
                     open_price = day_start_price
                 else:
                     # Open = previous close (no gaps)
-                    open_price = data[-1]['close']
+                    open_price = data[-1]['Close']
                 
                 # Progress through the day toward target
                 day_progress = (candle_idx + 1) / len(day_timestamps)
@@ -159,15 +159,15 @@ class TestPDHPDLDetector:
                 volume = int(base_volume * volume_noise)
                 
                 data.append({
-                    'open': open_price,
-                    'high': high,
-                    'low': low,
-                    'close': close_price,
-                    'volume': volume
+                    'Open': open_price,
+                    'High': high,
+                    'Low': low,
+                    'Close': close_price,
+                    'Volume': volume
                 })
             
             # Update current price for next day
-            current_price = data[-1]['close']
+            current_price = data[-1]['Close']
         
         df = pd.DataFrame(data, index=timestamps)
         return df
@@ -192,17 +192,17 @@ class TestPDHPDLDetector:
         # Test with missing columns
         bad_df = pd.DataFrame({
             'price': [100, 101, 102],
-            'volume': [1000, 1100, 1200]
+            'Volume': [1000, 1100, 1200]
         }, index=pd.date_range('2023-01-01', periods=3, freq='h'))
         levels = self.detector.detect_daily_levels(bad_df)
         assert levels == []
         
         # Test with non-DatetimeIndex
         bad_index_df = pd.DataFrame({
-            'open': [100, 101, 102],
-            'high': [102, 103, 104],
-            'low': [98, 99, 100],
-            'close': [101, 102, 103]
+            'Open': [100, 101, 102],
+            'High': [102, 103, 104],
+            'Low': [98, 99, 100],
+            'Close': [101, 102, 103]
         })
         levels = self.detector.detect_daily_levels(bad_index_df)
         assert levels == []
@@ -268,23 +268,23 @@ class TestPDHPDLDetector:
         for i, ts in enumerate(timestamps):
             if i < 24:  # Day 1
                 if i == 12:  # Peak hour
-                    data_point = {'open': 108, 'high': 110, 'low': 107, 'close': 109}
+                    data_point = {'Open': 108, 'High': 110, 'Low': 107, 'Close': 109}
                 elif i == 6:   # Low hour
-                    data_point = {'open': 92, 'high': 93, 'low': 90, 'close': 91}
+                    data_point = {'Open': 92, 'High': 93, 'Low': 90, 'Close': 91}
                 else:
-                    data_point = {'open': 100, 'high': 102, 'low': 98, 'close': 101}
+                    data_point = {'Open': 100, 'High': 102, 'Low': 98, 'Close': 101}
             elif i < 48:  # Day 2 - break above previous high
                 if i == 36:  # Break PDH
-                    data_point = {'open': 110, 'high': 115, 'low': 109, 'close': 114}
+                    data_point = {'Open': 110, 'High': 115, 'Low': 109, 'Close': 114}
                 else:
-                    data_point = {'open': 105, 'high': 107, 'low': 103, 'close': 106}
+                    data_point = {'Open': 105, 'High': 107, 'Low': 103, 'Close': 106}
             else:  # Day 3 - break below previous low
                 if i == 60:  # Break PDL
-                    data_point = {'open': 90, 'high': 91, 'low': 85, 'close': 86}
+                    data_point = {'Open': 90, 'High': 91, 'Low': 85, 'Close': 86}
                 else:
-                    data_point = {'open': 95, 'high': 97, 'low': 93, 'close': 96}
+                    data_point = {'Open': 95, 'High': 97, 'Low': 93, 'Close': 96}
             
-            data_point['volume'] = 1000
+            data_point['Volume'] = 1000
             test_data.append(data_point)
         
         test_df = pd.DataFrame(test_data, index=timestamps)
@@ -318,7 +318,7 @@ class TestPDHPDLDetector:
         levels = self.detector.detect_all_levels(self.sample_data)
         
         if levels:
-            current_price = self.sample_data['close'].iloc[-1]
+            current_price = self.sample_data['Close'].iloc[-1]
             near_levels = self.detector.get_levels_near_price(levels, current_price, distance_pct=0.05)
             
             # All near levels should be within 5% of current price
@@ -397,11 +397,11 @@ class TestPDHPDLDetector:
         
         # Plot candlesticks
         for i, (timestamp, row) in enumerate(sample_data.iterrows()):
-            color = 'green' if row['close'] >= row['open'] else 'red'
+            color = 'green' if row['Close'] >= row['Open'] else 'red'
             
             # Candlestick body
-            body_height = abs(row['close'] - row['open'])
-            body_bottom = min(row['close'], row['open'])
+            body_height = abs(row['Close'] - row['Open'])
+            body_bottom = min(row['Close'], row['Open'])
             
             # Draw body
             rect = Rectangle((i - 0.3, body_bottom), 0.6, body_height, 
@@ -409,8 +409,8 @@ class TestPDHPDLDetector:
             ax.add_patch(rect)
             
             # Draw wicks
-            ax.plot([i, i], [row['low'], min(row['open'], row['close'])], 'k-', linewidth=1)
-            ax.plot([i, i], [max(row['open'], row['close']), row['high']], 'k-', linewidth=1)
+            ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
+            ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
         
         # Plot levels with validity visualization
         colors = {'PDH': 'red', 'PDL': 'green', 'PWH': 'darkred', 'PWL': 'darkgreen'}
@@ -539,17 +539,17 @@ class TestPDHPDLDetector:
         
         # Plot candlesticks
         for i, (timestamp, row) in enumerate(sample_data.iterrows()):
-            color = 'green' if row['close'] >= row['open'] else 'red'
+            color = 'green' if row['Close'] >= row['Open'] else 'red'
             
-            body_height = abs(row['close'] - row['open'])
-            body_bottom = min(row['close'], row['open'])
+            body_height = abs(row['Close'] - row['Open'])
+            body_bottom = min(row['Close'], row['Open'])
             
             rect = Rectangle((i - 0.3, body_bottom), 0.6, body_height, 
                            facecolor=color, edgecolor='black', alpha=0.7)
             ax.add_patch(rect)
             
-            ax.plot([i, i], [row['low'], min(row['open'], row['close'])], 'k-', linewidth=1)
-            ax.plot([i, i], [max(row['open'], row['close']), row['high']], 'k-', linewidth=1)
+            ax.plot([i, i], [row['Low'], min(row['Open'], row['Close'])], 'k-', linewidth=1)
+            ax.plot([i, i], [max(row['Open'], row['Close']), row['High']], 'k-', linewidth=1)
         
         # Plot levels with validity status
         colors = {'PDH': 'red', 'PDL': 'green', 'PWH': 'darkred', 'PWL': 'darkgreen'}

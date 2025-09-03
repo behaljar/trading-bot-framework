@@ -242,7 +242,6 @@ class GridSearchOptimizer:
         """
         self.strategy_class = strategy_class
         self.parameter_config = parameter_config
-        self.data = self._prepare_data(data)
         self.initial_capital = initial_capital
         self.commission = commission
         self.margin = margin
@@ -252,18 +251,6 @@ class GridSearchOptimizer:
         
         # Generate parameter combinations
         self.combinations = generate_parameter_combinations(parameter_config)
-        
-    def _prepare_data(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Prepare data for backtesting."""
-        # Rename columns to match backtesting.py expectations
-        data = data.rename(columns={
-            'open': 'Open',
-            'high': 'High',
-            'low': 'Low',
-            'close': 'Close',
-            'volume': 'Volume'
-        })
-        return data
     
     def _print_progress_bar(self, completed: int, total: int, start_time: float, 
                            bar_length: int = 50):

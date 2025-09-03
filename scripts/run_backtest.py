@@ -35,7 +35,6 @@ from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
 from framework.strategies.silver_bullet_fvg_strategy import SilverBulletFVGStrategy
-from framework.strategies.ict_silver_bullet_strategy import ICTSilverBulletStrategy
 from framework.backtesting.strategy_wrapper import create_wrapper_class
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
@@ -59,19 +58,7 @@ def load_data(file_path: str, start_date: Optional[str] = None,
         df = df[df.index >= start_date]
     if end_date:
         df = df[df.index <= end_date]
-    
-    # backtesting.py expects specific column names (capitalized)
-    column_mapping = {
-        'open': 'Open',
-        'high': 'High', 
-        'low': 'Low',
-        'close': 'Close',
-        'volume': 'Volume'
-    }
-    
-    # Rename columns if needed
-    df = df.rename(columns=column_mapping)
-    
+
     # Ensure we have the required columns
     required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     missing_cols = [col for col in required_cols if col not in df.columns]
@@ -102,8 +89,7 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
         'sma': SMAStrategy,
         'fvg': FVGStrategy,
         'breakout': BreakoutStrategy,
-        'silver_bullet_fvg': SilverBulletFVGStrategy,
-        'ict_silver_bullet': ICTSilverBulletStrategy
+        'silver_bullet_fvg': SilverBulletFVGStrategy
         # Add more strategies here as they become available
         # 'rsi': RSIStrategy,
         # 'macd': MACDStrategy,
@@ -268,7 +254,7 @@ def main():
     """Main function for running backtests."""
     parser = argparse.ArgumentParser(description="Run backtest using backtesting.py library")
     parser.add_argument("--strategy", type=str, required=True, 
-                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg', 'ict_silver_bullet'],
+                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg'],
                        help="Strategy to use")
     parser.add_argument("--data-file", type=str, required=True,
                        help="Path to CSV data file")

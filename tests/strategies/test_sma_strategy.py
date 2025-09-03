@@ -33,11 +33,11 @@ class TestSMAStrategy:
         prices = base_price + trend + noise
         
         data = pd.DataFrame({
-            'open': prices * 0.999,
-            'high': prices * 1.002,
-            'low': prices * 0.998,
-            'close': prices,
-            'volume': np.random.uniform(1000, 5000, length)
+            'Open': prices * 0.999,
+            'High': prices * 1.002,
+            'Low': prices * 0.998,
+            'Close': prices,
+            'Volume': np.random.uniform(1000, 5000, length)
         }, index=dates)
         
         return data
@@ -103,11 +103,11 @@ class TestSMAStrategy:
         close_prices = prices_down + prices_up
         
         data = pd.DataFrame({
-            'open': close_prices,
-            'high': [p * 1.01 for p in close_prices],
-            'low': [p * 0.99 for p in close_prices],
-            'close': close_prices,
-            'volume': [1000] * 20
+            'Open': close_prices,
+            'High': [p * 1.01 for p in close_prices],
+            'Low': [p * 0.99 for p in close_prices],
+            'Close': close_prices,
+            'Volume': [1000] * 20
         }, index=dates)
         
         strategy = SMAStrategy(short_window=3, long_window=5)
@@ -128,7 +128,7 @@ class TestSMAStrategy:
             for idx, row in buy_signals.iterrows():
                 if pd.notna(row['stop_loss']):
                     # Stop loss should be 2% below entry price
-                    expected_stop = row['close'] * (1 - 0.02)
+                    expected_stop = row['Close'] * (1 - 0.02)
                     assert abs(row['stop_loss'] - expected_stop) < 0.01
 
     def test_stop_loss_calculation_short(self):
@@ -142,11 +142,11 @@ class TestSMAStrategy:
         close_prices = prices_high + prices_down
         
         data = pd.DataFrame({
-            'open': close_prices,
-            'high': [p * 1.01 for p in close_prices],
-            'low': [p * 0.99 for p in close_prices],
-            'close': close_prices,
-            'volume': [1000] * 20
+            'Open': close_prices,
+            'High': [p * 1.01 for p in close_prices],
+            'Low': [p * 0.99 for p in close_prices],
+            'Close': close_prices,
+            'Volume': [1000] * 20
         }, index=dates)
         
         strategy = SMAStrategy(short_window=3, long_window=5, stop_loss_pct=0.02)
@@ -158,7 +158,7 @@ class TestSMAStrategy:
             for idx, row in sell_signals.iterrows():
                 if pd.notna(row['stop_loss']):
                     # Stop loss should be 2% above entry price for short
-                    expected_stop = row['close'] * (1 + 0.02)
+                    expected_stop = row['Close'] * (1 + 0.02)
                     assert abs(row['stop_loss'] - expected_stop) < 0.01
 
     def test_take_profit_calculation_long(self):
@@ -172,7 +172,7 @@ class TestSMAStrategy:
             for idx, row in buy_signals.iterrows():
                 if pd.notna(row['take_profit']):
                     # Take profit should be 4% above entry price
-                    expected_tp = row['close'] * (1 + 0.04)
+                    expected_tp = row['Close'] * (1 + 0.04)
                     assert abs(row['take_profit'] - expected_tp) < 0.01
 
     def test_take_profit_calculation_short(self):
@@ -184,11 +184,11 @@ class TestSMAStrategy:
         close_prices = prices_high + prices_down
         
         data = pd.DataFrame({
-            'open': close_prices,
-            'high': [p * 1.01 for p in close_prices],
-            'low': [p * 0.99 for p in close_prices],
-            'close': close_prices,
-            'volume': [1000] * 20
+            'Open': close_prices,
+            'High': [p * 1.01 for p in close_prices],
+            'Low': [p * 0.99 for p in close_prices],
+            'Close': close_prices,
+            'Volume': [1000] * 20
         }, index=dates)
         
         strategy = SMAStrategy(short_window=3, long_window=5, take_profit_pct=0.04)
@@ -200,7 +200,7 @@ class TestSMAStrategy:
             for idx, row in sell_signals.iterrows():
                 if pd.notna(row['take_profit']):
                     # Take profit should be 4% below entry price for short
-                    expected_tp = row['close'] * (1 - 0.04)
+                    expected_tp = row['Close'] * (1 - 0.04)
                     assert abs(row['take_profit'] - expected_tp) < 0.01
 
     def test_no_stop_loss_or_take_profit(self):
@@ -232,8 +232,8 @@ class TestSMAStrategy:
         """Test handling of invalid data format."""
         # Missing required columns
         invalid_data = pd.DataFrame({
-            'close': [100, 101, 102],
-            'volume': [1000, 1100, 1200]
+            'Close': [100, 101, 102],
+            'Volume': [1000, 1100, 1200]
         })
         
         with pytest.raises(ValueError, match="Invalid data format"):
@@ -261,11 +261,11 @@ class TestSMAStrategy:
         close_prices = list(range(100, 115))  # 100, 101, 102, ..., 114
         
         data = pd.DataFrame({
-            'open': close_prices,
-            'high': [p + 0.5 for p in close_prices],
-            'low': [p - 0.5 for p in close_prices],
-            'close': close_prices,
-            'volume': [1000] * 15
+            'Open': close_prices,
+            'High': [p + 0.5 for p in close_prices],
+            'Low': [p - 0.5 for p in close_prices],
+            'Close': close_prices,
+            'Volume': [1000] * 15
         }, index=dates)
         
         strategy = SMAStrategy(short_window=3, long_window=5)
@@ -292,11 +292,11 @@ class TestSMAStrategy:
         close_prices = decline_prices + rise_prices
         
         data = pd.DataFrame({
-            'open': close_prices,
-            'high': [p + 0.5 for p in close_prices],
-            'low': [p - 0.5 for p in close_prices],
-            'close': close_prices,
-            'volume': [1000] * 25
+            'Open': close_prices,
+            'High': [p + 0.5 for p in close_prices],
+            'Low': [p - 0.5 for p in close_prices],
+            'Close': close_prices,
+            'Volume': [1000] * 25
         }, index=dates)
         
         strategy = SMAStrategy(short_window=3, long_window=6)

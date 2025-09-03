@@ -54,9 +54,9 @@ class BreakoutStrategy(BaseStrategy):
 
     def calculate_atr(self, data: pd.DataFrame) -> pd.Series:
         """Calculate Average True Range"""
-        high = data['high']
-        low = data['low']
-        close = data['close']
+        high = data['High']
+        low = data['Low']
+        close = data['Close']
         
         # True Range calculation
         hl = high - low
@@ -73,35 +73,35 @@ class BreakoutStrategy(BaseStrategy):
         data = data.copy()
         
         # Calculate rolling highs and lows for entries
-        data[f'high_{self.params["entry_lookback"]}'] = data['high'].rolling(
+        data[f'high_{self.params["entry_lookback"]}'] = data['High'].rolling(
             window=self.params['entry_lookback']
         ).max()
         
-        data[f'low_{self.params["entry_lookback"]}'] = data['low'].rolling(
+        data[f'low_{self.params["entry_lookback"]}'] = data['Low'].rolling(
             window=self.params['entry_lookback']
         ).min()
         
         # Calculate rolling highs and lows for exits
-        data[f'high_{self.params["exit_lookback"]}'] = data['high'].rolling(
+        data[f'high_{self.params["exit_lookback"]}'] = data['High'].rolling(
             window=self.params['exit_lookback']
         ).max()
         
-        data[f'low_{self.params["exit_lookback"]}'] = data['low'].rolling(
+        data[f'low_{self.params["exit_lookback"]}'] = data['Low'].rolling(
             window=self.params['exit_lookback']
         ).min()
         
         # Calculate multi-timeframe trend filters
         # Long-term trend (major trend direction)
-        longterm_price_shift = data['close'].shift(self.params['longterm_trend_period'])
-        data['longterm_trend_roc'] = (data['close'] - longterm_price_shift) / longterm_price_shift
+        longterm_price_shift = data['Close'].shift(self.params['longterm_trend_period'])
+        data['longterm_trend_roc'] = (data['Close'] - longterm_price_shift) / longterm_price_shift
         
         # Medium trend (intermediate trend)
-        medium_price_shift = data['close'].shift(self.params['medium_trend_period'])
-        data['medium_trend_roc'] = (data['close'] - medium_price_shift) / medium_price_shift
+        medium_price_shift = data['Close'].shift(self.params['medium_trend_period'])
+        data['medium_trend_roc'] = (data['Close'] - medium_price_shift) / medium_price_shift
         
         # Calculate relative volume (volume vs moving average)
-        data['volume_ma'] = data['volume'].rolling(window=self.params['volume_ma_period']).mean()
-        data['relative_volume'] = data['volume'] / data['volume_ma']
+        data['volume_ma'] = data['Volume'].rolling(window=self.params['volume_ma_period']).mean()
+        data['relative_volume'] = data['Volume'] / data['volume_ma']
         
         # Calculate ATR
         data['atr'] = self.calculate_atr(data)
@@ -109,23 +109,23 @@ class BreakoutStrategy(BaseStrategy):
         # Calculate momentum exit indicators (big candles with high volume)
         if self.params['use_momentum_exit']:
             # Calculate candle size as percentage move
-            data['candle_size_pct'] = abs(data['close'] - data['open']) / data['open']
+            data['candle_size_pct'] = abs(data['Close'] - data['Open']) / data['Open']
             
             # Calculate volume moving average for comparison
-            data['volume_ma_momentum'] = data['volume'].rolling(window=self.params['momentum_volume_period']).mean()
-            data['volume_ratio_momentum'] = data['volume'] / data['volume_ma_momentum']
+            data['volume_ma_momentum'] = data['Volume'].rolling(window=self.params['momentum_volume_period']).mean()
+            data['volume_ratio_momentum'] = data['Volume'] / data['volume_ma_momentum']
             
             # Momentum exhaustion signals:
             # For longs: big UP candle with high volume (selling climax after uptrend)
             data['long_momentum_exit'] = (
-                (data['close'] > data['open']) &  # Bullish candle
+                (data['Close'] > data['Open']) &  # Bullish candle
                 (data['candle_size_pct'] >= self.params['momentum_candle_threshold']) &  # Big candle
                 (data['volume_ratio_momentum'] >= self.params['momentum_volume_threshold'])  # High volume
             )
             
             # For shorts: big DOWN candle with high volume (buying climax after downtrend)
             data['short_momentum_exit'] = (
-                (data['close'] < data['open']) &  # Bearish candle
+                (data['Close'] < data['Open']) &  # Bearish candle
                 (data['candle_size_pct'] >= self.params['momentum_candle_threshold']) &  # Big candle
                 (data['volume_ratio_momentum'] >= self.params['momentum_volume_threshold'])  # High volume
             )
@@ -139,9 +139,9 @@ class BreakoutStrategy(BaseStrategy):
             
         data_with_indicators = self.add_indicators(data)
         
-        close_prices = data['close']
-        high_prices = data['high']
-        low_prices = data['low']
+        close_prices = data['Close']
+        high_prices = data['High']
+        low_prices = data['Low']
         
         # Get indicators
         prev_high_entry = data_with_indicators[f'high_{self.params["entry_lookback"]}'].shift(1)

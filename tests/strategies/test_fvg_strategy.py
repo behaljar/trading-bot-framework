@@ -39,11 +39,11 @@ class TestFVGStrategy:
             prices.append(new_price)
         
         data = pd.DataFrame({
-            'open': [p * 0.9995 for p in prices],
-            'high': [p * 1.005 for p in prices],
-            'low': [p * 0.995 for p in prices],
-            'close': prices,
-            'volume': np.random.uniform(10, 100, length)
+            'Open': [p * 0.9995 for p in prices],
+            'High': [p * 1.005 for p in prices],
+            'Low': [p * 0.995 for p in prices],
+            'Close': prices,
+            'Volume': np.random.uniform(10, 100, length)
         }, index=dates)
         
         return data
@@ -78,25 +78,25 @@ class TestFVGStrategy:
         """Test timeframe detection for M15 data."""
         data = self.create_test_data_m15(100)
         timeframe = self.strategy._detect_timeframe(data)
-        assert timeframe == '15T'
+        assert timeframe == '15min'
 
     def test_detect_timeframe_h1(self):
         """Test timeframe detection for H1 data."""
         dates = pd.date_range(start='2024-01-01', periods=50, freq='1H')
         data = pd.DataFrame({
-            'open': range(100, 150),
-            'high': range(101, 151),
-            'low': range(99, 149),
-            'close': range(100, 150),
-            'volume': [1000] * 50
+            'Open': range(100, 150),
+            'High': range(101, 151),
+            'Low': range(99, 149),
+            'Close': range(100, 150),
+            'Volume': [1000] * 50
         }, index=dates)
         
         timeframe = self.strategy._detect_timeframe(data)
-        assert timeframe == '1H'
+        assert timeframe == '1h'
 
     def test_detect_timeframe_insufficient_data(self):
         """Test timeframe detection with insufficient data."""
-        data = pd.DataFrame({'close': [100]}, index=[datetime.now()])
+        data = pd.DataFrame({'Close': [100]}, index=[datetime.now()])
         timeframe = self.strategy._detect_timeframe(data)
         assert timeframe == 'unknown'
 
@@ -105,19 +105,19 @@ class TestFVGStrategy:
         ny_tz = pytz.timezone('America/New_York')
         
         # Test London Open window (3:00-4:00 NY time)
-        london_time = datetime(2024, 1, 15, 3, 30, tzinfo=ny_tz)  # Monday 3:30 AM NY
+        london_time = pd.Timestamp(datetime(2024, 1, 15, 3, 30, tzinfo=ny_tz))  # Monday 3:30 AM NY
         assert self.strategy._is_execution_window(london_time) is True
         
         # Test NY Open window (10:00-11:00 NY time)
-        ny_open_time = datetime(2024, 1, 15, 10, 15, tzinfo=ny_tz)  # Monday 10:15 AM NY
+        ny_open_time = pd.Timestamp(datetime(2024, 1, 15, 10, 15, tzinfo=ny_tz))  # Monday 10:15 AM NY
         assert self.strategy._is_execution_window(ny_open_time) is True
         
         # Test NY Afternoon window (14:00-15:00 NY time)
-        ny_afternoon_time = datetime(2024, 1, 15, 14, 45, tzinfo=ny_tz)  # Monday 2:45 PM NY
+        ny_afternoon_time = pd.Timestamp(datetime(2024, 1, 15, 14, 45, tzinfo=ny_tz))  # Monday 2:45 PM NY
         assert self.strategy._is_execution_window(ny_afternoon_time) is True
         
         # Test outside execution window
-        outside_time = datetime(2024, 1, 15, 12, 0, tzinfo=ny_tz)  # Monday 12:00 PM NY
+        outside_time = pd.Timestamp(datetime(2024, 1, 15, 12, 0, tzinfo=ny_tz))  # Monday 12:00 PM NY
         assert self.strategy._is_execution_window(outside_time) is False
 
     def test_is_execution_window_utc_conversion(self):
@@ -174,11 +174,11 @@ class TestFVGStrategy:
         # Create daily data
         daily_dates = pd.date_range(start='2024-01-01', periods=5, freq='D')
         daily_data = pd.DataFrame({
-            'open': [100, 105, 110, 115, 120],
-            'high': [102, 107, 112, 117, 122],
-            'low': [98, 103, 108, 113, 118],
-            'close': [101, 106, 111, 116, 121],
-            'volume': [1000] * 5
+            'Open': [100, 105, 110, 115, 120],
+            'High': [102, 107, 112, 117, 122],
+            'Low': [98, 103, 108, 113, 118],
+            'Close': [101, 106, 111, 116, 121],
+            'Volume': [1000] * 5
         }, index=daily_dates)
         
         # Test bullish FVG with price above daily open
@@ -197,11 +197,11 @@ class TestFVGStrategy:
         # Create daily data
         daily_dates = pd.date_range(start='2024-01-01', periods=5, freq='D')
         daily_data = pd.DataFrame({
-            'open': [100, 105, 110, 115, 120],
-            'high': [102, 107, 112, 117, 122],
-            'low': [98, 103, 108, 113, 118],
-            'close': [101, 106, 111, 116, 121],
-            'volume': [1000] * 5
+            'Open': [100, 105, 110, 115, 120],
+            'High': [102, 107, 112, 117, 122],
+            'Low': [98, 103, 108, 113, 118],
+            'Close': [101, 106, 111, 116, 121],
+            'Volume': [1000] * 5
         }, index=daily_dates)
         
         # Test bearish FVG with price below daily open
@@ -229,11 +229,11 @@ class TestFVGStrategy:
         # Create H1 data instead of M15
         dates = pd.date_range(start='2024-01-01', periods=100, freq='1H')
         data = pd.DataFrame({
-            'open': range(100, 200),
-            'high': range(101, 201),
-            'low': range(99, 199),
-            'close': range(100, 200),
-            'volume': [1000] * 100
+            'Open': range(100, 200),
+            'High': range(101, 201),
+            'Low': range(99, 199),
+            'Close': range(100, 200),
+            'Volume': [1000] * 100
         }, index=dates)
         
         signals = self.strategy.generate_signals(data)
@@ -263,11 +263,11 @@ class TestFVGStrategy:
         prices = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
         
         data = pd.DataFrame({
-            'open': prices,
-            'high': [p + 1 for p in prices],
-            'low': [p - 1 for p in prices],
-            'close': prices,
-            'volume': [1000] * 10
+            'Open': prices,
+            'High': [p + 1 for p in prices],
+            'Low': [p - 1 for p in prices],
+            'Close': prices,
+            'Volume': [1000] * 10
         }, index=dates)
         
         # Mock FVG object
@@ -285,7 +285,7 @@ class TestFVGStrategy:
         
         # Test mitigated case by modifying data
         data_mitigated = data.copy()
-        data_mitigated.loc[data_mitigated.index[5], 'low'] = 101.0  # Below FVG bottom
+        data_mitigated.loc[data_mitigated.index[5], 'Low'] = 101.0  # Below FVG bottom
         result = self.strategy._is_fvg_unmitigated(data_mitigated, bullish_fvg, 2, 8)
         assert result is False
 
@@ -296,11 +296,11 @@ class TestFVGStrategy:
         prices = [109, 108, 107, 106, 105, 104, 103, 102, 101, 100]
         
         data = pd.DataFrame({
-            'open': prices,
-            'high': [p + 1 for p in prices],
-            'low': [p - 1 for p in prices],
-            'close': prices,
-            'volume': [1000] * 10
+            'Open': prices,
+            'High': [p + 1 for p in prices],
+            'Low': [p - 1 for p in prices],
+            'Close': prices,
+            'Volume': [1000] * 10
         }, index=dates)
         
         # Mock FVG object
@@ -318,7 +318,7 @@ class TestFVGStrategy:
         
         # Test mitigated case by modifying data
         data_mitigated = data.copy()
-        data_mitigated.loc[data_mitigated.index[5], 'high'] = 107.0  # Above FVG top
+        data_mitigated.loc[data_mitigated.index[5], 'High'] = 107.0  # Above FVG top
         result = self.strategy._is_fvg_unmitigated(data_mitigated, bearish_fvg, 2, 8)
         assert result is False
 
@@ -328,11 +328,11 @@ class TestFVGStrategy:
         
         # Create H4 data by resampling
         h4_data = m15_data.resample('4h').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
         }).dropna()
         
         # Mock H4 FVG
@@ -358,11 +358,11 @@ class TestFVGStrategy:
         # Create very stable price data (no gaps)
         dates = pd.date_range(start='2024-01-01', periods=500, freq='15T')
         data = pd.DataFrame({
-            'open': [50000] * 500,
-            'high': [50001] * 500,
-            'low': [49999] * 500,
-            'close': [50000] * 500,
-            'volume': [1000] * 500
+            'Open': [50000] * 500,
+            'High': [50001] * 500,
+            'Low': [49999] * 500,
+            'Close': [50000] * 500,
+            'Volume': [1000] * 500
         }, index=dates)
         
         signals = self.strategy.generate_signals(data)
@@ -381,8 +381,8 @@ class TestFVGStrategy:
         """Test handling of invalid data format."""
         # Missing required columns
         invalid_data = pd.DataFrame({
-            'close': [100, 101, 102],
-            'volume': [1000, 1100, 1200]
+            'Close': [100, 101, 102],
+            'Volume': [1000, 1100, 1200]
         })
         
         with pytest.raises(ValueError, match="Invalid data format"):

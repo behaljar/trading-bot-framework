@@ -181,11 +181,11 @@ class TestGridSearchOptimizer:
         prices = base_price + trend + noise
         
         return pd.DataFrame({
-            'open': prices * 0.999,
-            'high': prices * 1.005,
-            'low': prices * 0.995,
-            'close': prices,
-            'volume': np.random.uniform(1000, 5000, length)
+            'Open': prices * 0.999,
+            'High': prices * 1.005,
+            'Low': prices * 0.995,
+            'Close': prices,
+            'Volume': np.random.uniform(1000, 5000, length)
         }, index=dates)
 
     def test_initialization(self):
@@ -410,11 +410,11 @@ class TestGridSearchIntegration:
         prices = np.linspace(100, 120, length)
         
         return pd.DataFrame({
-            'open': prices * 0.999,
-            'high': prices * 1.001,
-            'low': prices * 0.999,
-            'close': prices,
-            'volume': [1000] * length
+            'Open': prices * 0.999,
+            'High': prices * 1.001,
+            'Low': prices * 0.999,
+            'Close': prices,
+            'Volume': [1000] * length
         }, index=dates)
 
     def test_small_optimization_run(self):

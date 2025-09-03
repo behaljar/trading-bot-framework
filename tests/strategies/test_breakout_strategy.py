@@ -33,18 +33,18 @@ class TestBreakoutStrategy:
         
         # Create OHLC data with realistic spreads
         self.test_data = pd.DataFrame({
-            'open': closes + np.random.normal(0, 0.5, 100),
-            'high': closes + np.abs(np.random.normal(1, 0.5, 100)),
-            'low': closes - np.abs(np.random.normal(1, 0.5, 100)),
-            'close': closes,
-            'volume': np.random.lognormal(10, 0.5, 100)  # Realistic volume distribution
+            'Open': closes + np.random.normal(0, 0.5, 100),
+            'High': closes + np.abs(np.random.normal(1, 0.5, 100)),
+            'Low': closes - np.abs(np.random.normal(1, 0.5, 100)),
+            'Close': closes,
+            'Volume': np.random.lognormal(10, 0.5, 100)  # Realistic volume distribution
         }, index=dates)
         
         # Ensure OHLC consistency
         for i in range(len(self.test_data)):
             row = self.test_data.iloc[i]
-            self.test_data.iloc[i, self.test_data.columns.get_loc('high')] = max(row['open'], row['high'], row['close'])
-            self.test_data.iloc[i, self.test_data.columns.get_loc('low')] = min(row['open'], row['low'], row['close'])
+            self.test_data.iloc[i, self.test_data.columns.get_loc('High')] = max(row['Open'], row['High'], row['Close'])
+            self.test_data.iloc[i, self.test_data.columns.get_loc('Low')] = min(row['Open'], row['Low'], row['Close'])
         
     def test_strategy_initialization(self):
         """Test strategy initialization with default and custom parameters"""
@@ -111,7 +111,7 @@ class TestBreakoutStrategy:
         assert self.strategy.validate_data(self.test_data)
         
         # Test invalid data - missing columns
-        invalid_data = self.test_data.drop('close', axis=1)
+        invalid_data = self.test_data.drop('Close', axis=1)
         assert not self.strategy.validate_data(invalid_data)
         
         # Test invalid data - empty dataframe
@@ -148,18 +148,18 @@ class TestBreakoutStrategy:
         prices = [100] * 25 + [105, 108, 107, 109, 111] + [110 + i for i in range(20)]
         
         breakout_data = pd.DataFrame({
-            'open': [p - 0.5 + np.random.normal(0, 0.1) for p in prices],
-            'high': [p + 1 + abs(np.random.normal(0, 0.2)) for p in prices],
-            'low': [p - 1 - abs(np.random.normal(0, 0.2)) for p in prices],
-            'close': prices,
-            'volume': [1000 + np.random.normal(0, 100) for _ in prices]
+            'Open': [p - 0.5 + np.random.normal(0, 0.1) for p in prices],
+            'High': [p + 1 + abs(np.random.normal(0, 0.2)) for p in prices],
+            'Low': [p - 1 - abs(np.random.normal(0, 0.2)) for p in prices],
+            'Close': prices,
+            'Volume': [1000 + np.random.normal(0, 100) for _ in prices]
         }, index=dates)
         
         # Ensure OHLC consistency
         for i in range(len(breakout_data)):
             row = breakout_data.iloc[i]
-            breakout_data.iloc[i, breakout_data.columns.get_loc('high')] = max(row['open'], row['high'], row['close'])
-            breakout_data.iloc[i, breakout_data.columns.get_loc('low')] = min(row['open'], row['low'], row['close'])
+            breakout_data.iloc[i, breakout_data.columns.get_loc('High')] = max(row['Open'], row['High'], row['Close'])
+            breakout_data.iloc[i, breakout_data.columns.get_loc('Low')] = min(row['Open'], row['Low'], row['Close'])
         
         # Test with simplified parameters to ensure breakout detection
         strategy = BreakoutStrategy(
@@ -227,7 +227,7 @@ class TestBreakoutStrategy:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))
         
         # Plot 1: Price with breakout levels and signals
-        ax1.plot(range(len(self.test_data)), self.test_data['close'], 'b-', label='Close Price', alpha=0.7)
+        ax1.plot(range(len(self.test_data)), self.test_data['Close'], 'b-', label='Close Price', alpha=0.7)
         
         # Plot entry and exit levels
         data_with_indicators = self.strategy.add_indicators(self.test_data)
@@ -247,11 +247,11 @@ class TestBreakoutStrategy:
         sell_signals = signals['signal'] == -1
         
         if buy_signals.any():
-            ax1.scatter(np.where(buy_signals)[0], self.test_data['close'][buy_signals], 
+            ax1.scatter(np.where(buy_signals)[0], self.test_data['Close'][buy_signals], 
                        color='green', marker='^', s=100, label='Buy Signal', zorder=5)
                        
         if sell_signals.any():
-            ax1.scatter(np.where(sell_signals)[0], self.test_data['close'][sell_signals], 
+            ax1.scatter(np.where(sell_signals)[0], self.test_data['Close'][sell_signals], 
                        color='red', marker='v', s=100, label='Sell Signal', zorder=5)
         
         ax1.set_xlabel('Time Period')
@@ -264,7 +264,7 @@ class TestBreakoutStrategy:
         ax2_vol = ax2
         ax2_atr = ax2.twinx()
         
-        ax2_vol.bar(range(len(self.test_data)), self.test_data['volume'], alpha=0.6, color='lightblue', label='Volume')
+        ax2_vol.bar(range(len(self.test_data)), self.test_data['Volume'], alpha=0.6, color='lightblue', label='Volume')
         ax2_atr.plot(range(len(self.test_data)), data_with_indicators['atr'], 'orange', label='ATR')
         
         ax2_vol.set_xlabel('Time Period')
@@ -366,7 +366,7 @@ class TestBreakoutStrategy:
             for idx in buy_rows.index:
                 stop_loss = signals.loc[idx, 'stop_loss']
                 if not pd.isna(stop_loss):
-                    entry_price = self.test_data.loc[idx, 'close']
+                    entry_price = self.test_data.loc[idx, 'Close']
                     # Stop loss should be below entry price for long positions
                     assert stop_loss < entry_price
                     
@@ -419,18 +419,18 @@ class TestBreakoutStrategy:
             all_prices = np.concatenate([consolidation_prices, breakout_prices])
             
             realistic_data = pd.DataFrame({
-                'open': all_prices + np.random.normal(0, 50, len(all_prices)),
-                'high': all_prices + np.abs(np.random.normal(100, 50, len(all_prices))),
-                'low': all_prices - np.abs(np.random.normal(100, 50, len(all_prices))),
-                'close': all_prices,
-                'volume': np.random.lognormal(15, 0.5, len(all_prices))
+                'Open': all_prices + np.random.normal(0, 50, len(all_prices)),
+                'High': all_prices + np.abs(np.random.normal(100, 50, len(all_prices))),
+                'Low': all_prices - np.abs(np.random.normal(100, 50, len(all_prices))),
+                'Close': all_prices,
+                'Volume': np.random.lognormal(15, 0.5, len(all_prices))
             }, index=dates)
             
             # Ensure OHLC consistency
             for i in range(len(realistic_data)):
                 row = realistic_data.iloc[i]
-                realistic_data.iloc[i, realistic_data.columns.get_loc('high')] = max(row['open'], row['high'], row['close'])
-                realistic_data.iloc[i, realistic_data.columns.get_loc('low')] = min(row['open'], row['low'], row['close'])
+                realistic_data.iloc[i, realistic_data.columns.get_loc('High')] = max(row['Open'], row['High'], row['Close'])
+                realistic_data.iloc[i, realistic_data.columns.get_loc('Low')] = min(row['Open'], row['Low'], row['Close'])
             
             # Test strategy
             signals = self.strategy.generate_signals(realistic_data)
@@ -443,7 +443,7 @@ class TestBreakoutStrategy:
             fig, ax = plt.subplots(figsize=(15, 8))
             
             # Plot price and signals
-            ax.plot(range(len(realistic_data)), realistic_data['close'], 'b-', label='Close Price', linewidth=1)
+            ax.plot(range(len(realistic_data)), realistic_data['Close'], 'b-', label='Close Price', linewidth=1)
             
             # Plot breakout levels
             data_with_indicators = self.strategy.add_indicators(realistic_data)
@@ -461,11 +461,11 @@ class TestBreakoutStrategy:
             sell_signals = signals['signal'] == -1
             
             if buy_signals.any():
-                ax.scatter(np.where(buy_signals)[0], realistic_data['close'][buy_signals], 
+                ax.scatter(np.where(buy_signals)[0], realistic_data['Close'][buy_signals], 
                           color='green', marker='^', s=100, label='Buy Signal', zorder=5)
                           
             if sell_signals.any():
-                ax.scatter(np.where(sell_signals)[0], realistic_data['close'][sell_signals], 
+                ax.scatter(np.where(sell_signals)[0], realistic_data['Close'][sell_signals], 
                           color='red', marker='v', s=100, label='Sell Signal', zorder=5)
             
             ax.set_xlabel('Time Period')

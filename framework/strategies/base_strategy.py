@@ -19,7 +19,7 @@ class BaseStrategy(ABC):
         Generate trading signals based on the input data.
         
         Args:
-            data: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            data: DataFrame with columns ['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
                  with timestamp as index
                  
         Returns:
@@ -46,7 +46,7 @@ class BaseStrategy(ABC):
         Returns:
             True if data is valid, False otherwise
         """
-        required_columns = ['open', 'high', 'low', 'close', 'volume']
+        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
         
         if not all(col in data.columns for col in required_columns):
             return False

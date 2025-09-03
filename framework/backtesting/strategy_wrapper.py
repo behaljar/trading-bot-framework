@@ -51,17 +51,7 @@ class StrategyWrapper(Strategy):
             # Default to fixed position size manager with 10% position size
             self.__class__.risk_manager = FixedPositionSizeManager(position_size=0.1)
             self.logger.info("Using default FixedPositionSizeManager with 10% position size")
-        
-        # Convert backtesting.py data format to framework format
-        # backtesting.py uses capitalized OHLCV, framework uses lowercase
-        # Normalized data should work fine for FVG detection - ratios are preserved
-        self.framework_data = pd.DataFrame({
-            'open': self.data.Open,
-            'high': self.data.High,
-            'low': self.data.Low,
-            'close': self.data.Close,
-            'volume': self.data.Volume
-        }, index=self.data.index)
+
         
         # Generate signals for the entire dataset once
         self.signals = self.strategy.generate_signals(self.framework_data)
