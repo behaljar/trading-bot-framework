@@ -242,6 +242,7 @@ class GridSearchOptimizer:
         """
         self.strategy_class = strategy_class
         self.parameter_config = parameter_config
+        self.data = data
         self.initial_capital = initial_capital
         self.commission = commission
         self.margin = margin

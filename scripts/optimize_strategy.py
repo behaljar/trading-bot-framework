@@ -43,12 +43,12 @@ def get_default_param_config(strategy: str) -> dict:
             'position_size': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02}
         },
         'breakout': {
-            'entry_lookback': {'type': 'int', 'min': 15, 'max': 60, 'step': 15},
-            'exit_lookback': {'type': 'int', 'min': 5, 'max': 30, 'step': 5},
-            'atr_multiplier': {'type': 'float', 'min': 1.0, 'max': 3.5, 'step': 0.5},
-            'medium_trend_threshold': {'type': 'float', 'min': 0.02, 'max': 0.10, 'step': 0.02},
-            'relative_volume_threshold': {'type': 'float', 'min': 1.2, 'max': 3.0, 'step': 0.4},
-            'cooldown_periods': {'type': 'int', 'min': 2, 'max': 20, 'step': 6}
+            'swing_sensitivity': {'type': 'int', 'min': 2, 'max': 5, 'step': 1},
+            'bos_lookback': {'type': 'int', 'min': 15, 'max': 30, 'step': 5},
+            'obv_period': {'type': 'int', 'min': 15, 'max': 25, 'step': 5},
+            'atr_period': {'type': 'int', 'min': 10, 'max': 20, 'step': 5},
+            'atr_multiplier': {'type': 'float', 'min': 1.5, 'max': 3.0, 'step': 0.5},
+            'position_size': {'type': 'float', 'min': 0.005, 'max': 0.02, 'step': 0.005}
         }
     }
     return configs.get(strategy, {})

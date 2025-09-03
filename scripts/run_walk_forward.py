@@ -240,8 +240,9 @@ Examples:
                 }
             elif args.strategy == 'breakout':
                 parameter_config = {
-                    'entry_lookback': {'min': 20, 'max': 40, 'step': 5, 'type': 'int'},
-                    'exit_lookback': {'min': 10, 'max': 20, 'step': 2, 'type': 'int'},
+                    'swing_sensitivity': {'choices': [2, 3, 4]},
+                    'bos_lookback': {'choices': [15, 20, 25]},
+                    'obv_period': {'choices': [15, 20, 25]},
                     'atr_multiplier': {'choices': [2.0, 2.5, 3.0]}
                 }
             logger.warning(f"No PARAM_CONFIG environment variable found, using defaults: {parameter_config}")
