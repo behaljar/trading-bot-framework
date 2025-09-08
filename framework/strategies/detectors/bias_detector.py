@@ -2,12 +2,26 @@
 """
 Bias Detector
 
-Determines market bias based on candle relationships following specific rules:
-- Candles: C1 (T-2), C2 (T-1), C3 (Today)
-- Bias determination based on C2's position relative to C1
-- Bias validation based on C3's behavior relative to C2
+ This is a three-candle pattern detector that determines market bias based on candle relationships:
 
-Author: Claude Code
+  Core Logic:
+
+  - C1: Candle from 2 periods ago (T-2)
+  - C2: Previous candle (T-1)
+  - C3: Current candle (T)
+
+  Bias Determination Rules (based on C2 vs C1):
+
+  1. BULLISH: C2 closes above C1's high
+    - Target: C2's high must be claimed by C3
+  2. BEARISH: C2 closes below C1's low
+    - Target: C2's low must be claimed by C3
+  3. Inside Bar (IB): C2 closes inside C1's range with multiple subcases:
+    - If C2 high > C1 high → BEARISH (until C2 low claimed)
+    - If C2 low < C1 low → BULLISH (until C2 high claimed)
+    - If C2 completely inside C1 → NO_BIAS
+    - Otherwise → Inherit previous bias (IB)
+
 """
 
 import pandas as pd
