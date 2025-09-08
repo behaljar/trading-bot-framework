@@ -43,6 +43,7 @@ This is a comprehensive Python trading framework for algorithmic trading strateg
 
 **Scripts:**
 - `scripts/run_backtest.py` - Universal backtest runner for any strategy
+- `scripts/run_monte_carlo.py` - Monte Carlo simulation for strategy robustness analysis
 - `scripts/download_data.py` - Data fetching utilities
 - `scripts/preprocess_data.py` - Data preprocessing pipeline
 
@@ -114,6 +115,22 @@ uv run python scripts/run_backtest.py --strategy sma --data-file data/cleaned/BT
 The backtest uses 100x leverage by default (margin=0.01). When using high leverage, adjust position sizes accordingly:
 - With FixedRiskManager: The manager automatically calculates safe position sizes based on stop loss distance
 - With FixedPositionSizeManager: Use smaller position sizes (e.g., 0.001 = 0.1% instead of 0.1 = 10%)
+```
+
+### Monte Carlo Analysis
+```bash
+# Run Monte Carlo on most recent backtest (1000 simulations)
+python scripts/run_monte_carlo.py
+
+# Run with higher precision (5000 simulations)
+python scripts/run_monte_carlo.py --simulations 5000
+
+# Run on specific trades file
+python scripts/run_monte_carlo.py --trades-file output/backtests/sma_BTC_USDT_20240101_trades.csv
+
+# Complete workflow: backtest + Monte Carlo
+python scripts/run_backtest.py --strategy sma --symbol BTC_USDT --data-file data.csv
+python scripts/run_monte_carlo.py --simulations 2000
 ```
 
 ### Testing
