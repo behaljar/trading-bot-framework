@@ -9,8 +9,8 @@ Strategy Logic:
 1. Calculate Z-score based on rolling mean and standard deviation
 2. Enter SHORT when: Z-score > +2, RSI > 70 (overbought), ADX < 35 (low trend strength)
 3. Enter LONG when: Z-score < -2, RSI < 30 (oversold), ADX < 35 (low trend strength)  
-4. Exit when Z-score crosses back to 0 (mean reversion)
-5. Use ATR-based stop losses for risk management
+4. Exit when Z-score crosses back to 0 (mean reversion) OR hit SL/TP levels
+5. Use ATR-based stop losses and take profits for risk management
 
 Author: Claude Code
 """
@@ -32,7 +32,7 @@ class MeanReversionStrategy(BaseStrategy):
     
     def __init__(self, lookback_period: int = 20, z_threshold: float = 2.0,
                  rsi_period: int = 14, rsi_oversold: float = 30, rsi_overbought: float = 70,
-                 atr_period: int = 14, atr_multiplier: float = 2.0,
+                 atr_period: int = 14, atr_multiplier: float = 2.0, atr_tp_multiplier: float = 3.0,
                  adx_period: int = 14, adx_threshold: float = 35,
                  use_rsi_filter: bool = True, use_adx_filter: bool = True,
                  position_size: float = 0.01):
@@ -45,6 +45,7 @@ class MeanReversionStrategy(BaseStrategy):
             "rsi_overbought": rsi_overbought,
             "atr_period": atr_period,
             "atr_multiplier": atr_multiplier,
+            "atr_tp_multiplier": atr_tp_multiplier,
             "adx_period": adx_period,
             "adx_threshold": adx_threshold,
             "use_rsi_filter": use_rsi_filter,
@@ -61,7 +62,8 @@ class MeanReversionStrategy(BaseStrategy):
     def get_description(self) -> str:
         """Get strategy description"""
         return (f"Mean Reversion Strategy using Z-Score with {self.params['lookback_period']}-period lookback. "
-                f"Threshold: ±{self.params['z_threshold']}, RSI filter: {self.params['use_rsi_filter']}, "
+                f"Threshold: ±{self.params['z_threshold']}, SL: {self.params['atr_multiplier']}x ATR, "
+                f"TP: {self.params['atr_tp_multiplier']}x ATR, RSI filter: {self.params['use_rsi_filter']}, "
                 f"ADX filter: {self.params['use_adx_filter']}, Position size: {self.params['position_size']:.1%}")
 
     def calculate_atr(self, data: pd.DataFrame) -> pd.Series:
@@ -213,6 +215,7 @@ class MeanReversionStrategy(BaseStrategy):
                     
                     result.iloc[i, result.columns.get_loc('signal')] = 1
                     result.iloc[i, result.columns.get_loc('stop_loss')] = current_price - (atr * self.params['atr_multiplier'])
+                    result.iloc[i, result.columns.get_loc('take_profit')] = current_price + (atr * self.params['atr_tp_multiplier'])
                     position_type = 'long'
                     signals_generated += 1
                     
@@ -223,6 +226,7 @@ class MeanReversionStrategy(BaseStrategy):
                     
                     result.iloc[i, result.columns.get_loc('signal')] = -1
                     result.iloc[i, result.columns.get_loc('stop_loss')] = current_price + (atr * self.params['atr_multiplier'])
+                    result.iloc[i, result.columns.get_loc('take_profit')] = current_price - (atr * self.params['atr_tp_multiplier'])
                     position_type = 'short'
                     signals_generated += 1
         
