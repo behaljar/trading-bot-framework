@@ -223,9 +223,26 @@ class WalkForwardAnalyzer:
             # Step 1: Optimize on IS data using GridSearchOptimizer
             self.logger.info(f"Period {period_num}: Optimizing on IS data ({len(is_data)} points)")
             
+            # Get default strategy parameters to merge with optimization parameters
+            import inspect
+            strategy_init_sig = inspect.signature(self.strategy_class.__init__)
+            default_strategy_params = {}
+            for param_name, param in strategy_init_sig.parameters.items():
+                if param_name != 'self' and param.default != inspect.Parameter.empty:
+                    default_strategy_params[param_name] = param.default
+            
+            # Create parameter config that includes defaults for non-optimized parameters
+            complete_param_config = {}
+            # First add all parameters being optimized
+            complete_param_config.update(self.parameter_config)
+            # Then add any missing default parameters as fixed values
+            for param_name, default_value in default_strategy_params.items():
+                if param_name not in complete_param_config:
+                    complete_param_config[param_name] = {'values': [default_value]}
+            
             optimizer = GridSearchOptimizer(
                 strategy_class=self.strategy_class,
-                parameter_config=self.parameter_config,
+                parameter_config=complete_param_config,
                 data=is_data,
                 initial_capital=self.initial_capital,
                 commission=self.commission,
@@ -257,13 +274,28 @@ class WalkForwardAnalyzer:
             is_return = best_row['return_pct']
             
             self.logger.info(f"Period {period_num}: Best IS {self.optimization_metric}: {best_row[self.optimization_metric]:.2f}")
+            self.logger.info(f"Period {period_num}: IS trades: {best_row['num_trades']}, Best params: {best_params}")
             
             # Step 2: Test on OOS data
             self.logger.info(f"Period {period_num}: Testing on OOS data ({len(oos_data)} points)")
             
             # Create single-value parameter config for OOS testing
+            # IMPORTANT: We need to include ALL strategy parameters, not just the optimized ones
+            # Get default strategy parameters first
+            import inspect
+            strategy_init_sig = inspect.signature(self.strategy_class.__init__)
+            default_strategy_params = {}
+            for param_name, param in strategy_init_sig.parameters.items():
+                if param_name != 'self' and param.default != inspect.Parameter.empty:
+                    default_strategy_params[param_name] = param.default
+            
+            # Merge optimized parameters with defaults
+            complete_params = default_strategy_params.copy()
+            complete_params.update(best_params)
+            
+            # Create single-value parameter config for OOS testing with complete parameters
             oos_param_config = {}
-            for param_name, param_value in best_params.items():
+            for param_name, param_value in complete_params.items():
                 oos_param_config[param_name] = {'values': [param_value]}
             
             oos_optimizer = GridSearchOptimizer(
@@ -289,6 +321,11 @@ class WalkForwardAnalyzer:
             oos_return = oos_row['return_pct']
             
             self.logger.info(f"Period {period_num}: OOS {self.optimization_metric}: {oos_row[self.optimization_metric]:.2f}")
+            self.logger.info(f"Period {period_num}: OOS trades: {oos_row['num_trades']}")
+            
+            # Warn if OOS has 0 trades
+            if oos_row['num_trades'] == 0:
+                self.logger.warning(f"Period {period_num}: OOS period had 0 trades! This may indicate overfitting or parameter issues.")
             
             # Calculate WFE
             wfe_metrics = self._calculate_wfe(best_row, oos_row, is_data, oos_data)

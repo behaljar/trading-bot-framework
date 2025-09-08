@@ -43,6 +43,10 @@ class StrategyWrapper(Strategy):
         # Create instance of framework strategy
         if self.__class__.framework_strategy_class is None:
             raise ValueError("framework_strategy_class must be set")
+        
+        # Log strategy initialization parameters for debugging
+        if self.__class__.debug:
+            self.logger.debug(f"Initializing {self.__class__.framework_strategy_class.__name__} with params: {self.__class__.strategy_params}")
             
         self.strategy = self.__class__.framework_strategy_class(**self.__class__.strategy_params)
         
