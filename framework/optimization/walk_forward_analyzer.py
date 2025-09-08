@@ -663,23 +663,75 @@ WFE Consistency: {summary.get('wfe_consistency', 0):.3f}
         return periods
     
     def _convert_parameter_types(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert parameters to correct types based on parameter config."""
+        """Convert parameters to correct types based on strategy signature and parameter config."""
+        import inspect
+        
+        # Get strategy init signature to determine correct types
+        strategy_init_sig = inspect.signature(self.strategy_class.__init__)
+        
         converted_params = {}
         
         for param_name, param_value in params.items():
-            if param_name in self.parameter_config:
-                param_def = self.parameter_config[param_name]
-                param_type = param_def.get('type', 'float')
-                
-                if param_type == 'int':
-                    converted_params[param_name] = int(round(param_value))
+            # First check if we have type hint from strategy signature
+            if param_name in strategy_init_sig.parameters:
+                param_spec = strategy_init_sig.parameters[param_name]
+                if param_spec.annotation != inspect.Parameter.empty:
+                    # Use type hint if available
+                    if param_spec.annotation == int:
+                        converted_params[param_name] = int(round(param_value))
+                    elif param_spec.annotation == float:
+                        converted_params[param_name] = float(param_value)
+                    elif param_spec.annotation == bool:
+                        converted_params[param_name] = bool(param_value)
+                    else:
+                        converted_params[param_name] = param_value
+                # If no type hint, check default value type
+                elif param_spec.default != inspect.Parameter.empty:
+                    default_type = type(param_spec.default)
+                    if default_type == int:
+                        converted_params[param_name] = int(round(param_value))
+                    elif default_type == float:
+                        converted_params[param_name] = float(param_value)
+                    elif default_type == bool:
+                        converted_params[param_name] = bool(param_value)
+                    else:
+                        converted_params[param_name] = param_value
                 else:
-                    converted_params[param_name] = float(param_value)
+                    # No type hint or default, check parameter config
+                    if param_name in self.parameter_config:
+                        param_def = self.parameter_config[param_name]
+                        param_type = param_def.get('type', 'float')
+                        if param_type == 'int':
+                            converted_params[param_name] = int(round(param_value))
+                        else:
+                            converted_params[param_name] = float(param_value)
+                    else:
+                        # Last resort: intelligent guess based on value
+                        if isinstance(param_value, float) and param_value.is_integer():
+                            # Check if parameter name suggests it should be int
+                            if any(hint in param_name.lower() for hint in ['window', 'period', 'lookback', 'count', 'num']):
+                                converted_params[param_name] = int(param_value)
+                            else:
+                                converted_params[param_name] = param_value
+                        else:
+                            converted_params[param_name] = param_value
             else:
-                # Default conversion for parameters not in config
-                if isinstance(param_value, float) and param_value.is_integer():
-                    converted_params[param_name] = int(param_value)
+                # Parameter not in strategy signature, use config or intelligent guess
+                if param_name in self.parameter_config:
+                    param_def = self.parameter_config[param_name]
+                    param_type = param_def.get('type', 'float')
+                    if param_type == 'int':
+                        converted_params[param_name] = int(round(param_value))
+                    else:
+                        converted_params[param_name] = float(param_value)
                 else:
-                    converted_params[param_name] = param_value
+                    # Intelligent guess
+                    if isinstance(param_value, float) and param_value.is_integer():
+                        if any(hint in param_name.lower() for hint in ['window', 'period', 'lookback', 'count', 'num']):
+                            converted_params[param_name] = int(param_value)
+                        else:
+                            converted_params[param_name] = param_value
+                    else:
+                        converted_params[param_name] = param_value
         
         return converted_params
