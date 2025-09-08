@@ -36,6 +36,7 @@ from framework.strategies.sma_strategy import SMAStrategy
 from framework.strategies.fvg_strategy import FVGStrategy
 from framework.strategies.breakout_strategy import BreakoutStrategy
 from framework.strategies.silver_bullet_fvg_strategy import SilverBulletFVGStrategy
+from framework.strategies.mean_reversion_strategy import MeanReversionStrategy
 from framework.backtesting.strategy_wrapper import create_wrapper_class
 from framework.risk.fixed_position_size_manager import FixedPositionSizeManager
 from framework.risk.fixed_risk_manager import FixedRiskManager
@@ -90,7 +91,8 @@ def run_backtest(strategy_name: str, data: pd.DataFrame,
         'sma': SMAStrategy,
         'fvg': FVGStrategy,
         'breakout': BreakoutStrategy,
-        'silver_bullet_fvg': SilverBulletFVGStrategy
+        'silver_bullet_fvg': SilverBulletFVGStrategy,
+        'mean_reversion': MeanReversionStrategy
         # Add more strategies here as they become available
         # 'rsi': RSIStrategy,
         # 'macd': MACDStrategy,
@@ -299,7 +301,7 @@ def main():
     """Main function for running backtests."""
     parser = argparse.ArgumentParser(description="Run backtest using backtesting.py library")
     parser.add_argument("--strategy", type=str, required=True, 
-                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg'],
+                       choices=['sma', 'fvg', 'breakout', 'silver_bullet_fvg', 'mean_reversion'],
                        help="Strategy to use")
     parser.add_argument("--data-file", type=str, required=True,
                        help="Path to CSV data file")
